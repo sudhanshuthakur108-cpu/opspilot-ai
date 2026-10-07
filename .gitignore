@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/*
+!.yarn/releases
+.npm/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment files (keep the template)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Caches
+.cache/
+.eslintcache
+.stylelintcache
+
+# Deployment platform local state
+.vercel/
+
+# Editors and IDEs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
