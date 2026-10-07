@@ -112,7 +112,7 @@ All routes are planned and prefixed with `/api/v1`. Routes for organization-owne
 
 | Group | Planned routes | Access |
 | --- | --- | --- |
-| **Health** | `GET /health` (liveness)<br>`GET /health/ready` (readiness, includes a database ping) | Public |
+| **Health** | `GET /health` (liveness; **implemented**)<br>`GET /ready` (readiness; **implemented** with no dependency checks yet; a database ping and a 503 on failure are added with MongoDB) | Public |
 | **Auth** | `POST /auth/register`<br>`POST /auth/login`<br>`POST /auth/logout`<br>`GET /auth/me` | Public, except `logout` and `me` |
 | **Organizations** | `GET /orgs` (my organizations)<br>`POST /orgs`<br>`GET /orgs/:orgId`<br>`PATCH /orgs/:orgId`<br>`GET /orgs/:orgId/members` | Authenticated; member of the org; changes need an admin role |
 | **Customers** | `GET`, `POST /orgs/:orgId/customers`<br>`GET`, `PATCH`, `DELETE /orgs/:orgId/customers/:id` | Org member |
@@ -254,7 +254,7 @@ Planned variables are added to `server/.env.example` in the phase that first use
 
 - Each request gets an ID that is included in logs and error responses so problems can be traced.
 - Structured server logs redact passwords, tokens, cookies and API keys.
-- Other baseline protections: security headers (helmet, in place), plus a request body size limit and a timeout on outbound AI calls (both planned).
+- Other baseline protections: security headers (helmet) and a 10 kB JSON body limit are in place. A timeout on outbound AI calls is planned.
 - Express's `trust proxy` setting must match the real proxy chain (Vercel rewrite, then Render). This makes the client IP used for rate limiting correct and stops it being spoofed through `X-Forwarded-For`. The exact setting will be confirmed in Phase 3.
 
 ## 7. Testing and Deployment
@@ -290,13 +290,13 @@ To verify at deployment time:
 
 ## 8. Implementation Roadmap
 
-Each phase is small and has a testable **done when** condition. Phases 1 and 2 are in progress; nothing later is started.
+Each phase is small and has a testable **done when** condition. Phase 1 is done and Phase 2 is in progress; nothing later is started.
 
 | Phase | Scope | Done when |
 | --- | --- | --- |
 | **0. Foundation** (**Done**) | README, CLAUDE.md, .gitignore, .env.example | Files are reviewed and committed |
 | **0b. Architecture doc** (**Done**) | This document | Reviewed and committed |
-| **1. Server skeleton** (**In progress**: liveness route, config validation, error handler and tests are in place; the readiness route, request IDs and logging are not) | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
+| **1. Server skeleton** (**Done**; choosing the request-validation library is deferred to Phase 4, the first phase that validates request bodies) | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
 | **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |

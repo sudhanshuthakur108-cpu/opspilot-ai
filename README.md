@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with a health endpoint (`GET /api/v1/health`) and a React page that shows the API's status. None of the product features below are implemented yet.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs and JSON error responses, plus a React page that shows the API's status. None of the product features below are implemented yet.
 
 ## Planned Scope
 
@@ -63,7 +63,9 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 ├── server/               # Express API
 │   ├── src/
 │   │   ├── config/       # environment validation
-│   │   ├── middleware/   # 404 and error handling
+│   │   ├── lib/          # logger and error class
+│   │   ├── middleware/   # request IDs, request logging, 404 and error handling
+│   │   ├── testing/      # test helpers
 │   │   ├── modules/      # feature modules (currently: health)
 │   │   ├── app.js        # builds the Express app (used by tests)
 │   │   └── server.js     # validates config and starts listening
