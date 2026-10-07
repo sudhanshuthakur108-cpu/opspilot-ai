@@ -9,6 +9,9 @@ export async function connectDatabase(uri, { serverSelectionTimeoutMS = SERVER_S
   mongoose.set('sanitizeFilter', true);
 
   await mongoose.connect(uri, { serverSelectionTimeoutMS });
+
+  // Wait for declared indexes (such as the unique email index) before the server takes traffic.
+  await Promise.all(mongoose.modelNames().map((name) => mongoose.model(name).init()));
 }
 
 export function databaseState() {

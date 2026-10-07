@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
+import { DEFAULT_CLIENT_ORIGIN } from './config/auth.js';
 import { captureLogger } from './testing/captureLogger.js';
 
 const app = createApp({ logger: captureLogger() });
@@ -76,7 +77,10 @@ describe('unknown routes', () => {
   });
 
   it('return 404 for a method the route does not support', async () => {
-    const response = await request(app).post('/api/v1/health').send({ ok: true });
+    const response = await request(app)
+      .post('/api/v1/health')
+      .set('Origin', DEFAULT_CLIENT_ORIGIN)
+      .send({ ok: true });
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('NOT_FOUND');
@@ -86,7 +90,7 @@ describe('unknown routes', () => {
 describe('JSON request bodies', () => {
   it('rejects malformed JSON without echoing parser details', async () => {
     const response = await request(app)
-      .post('/api/v1/health')
+      .post('/api/v1/health').set('Origin', DEFAULT_CLIENT_ORIGIN)
       .set('Content-Type', 'application/json')
       .send('{"name": ');
 
@@ -102,7 +106,7 @@ describe('JSON request bodies', () => {
 
   it('rejects bodies over the 10 kB limit', async () => {
     const response = await request(app)
-      .post('/api/v1/health')
+      .post('/api/v1/health').set('Origin', DEFAULT_CLIENT_ORIGIN)
       .send({ text: 'x'.repeat(11 * 1024) });
 
     expect(response.status).toBe(413);
@@ -114,7 +118,7 @@ describe('JSON request bodies', () => {
 
   it('rejects an unsupported charset', async () => {
     const response = await request(app)
-      .post('/api/v1/health')
+      .post('/api/v1/health').set('Origin', DEFAULT_CLIENT_ORIGIN)
       .set('Content-Type', 'application/json; charset=iso-8859-1')
       .send('{}');
 

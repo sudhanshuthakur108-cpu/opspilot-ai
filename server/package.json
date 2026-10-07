@@ -9,8 +9,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@node-rs/argon2": "2.2.2",
     "express": "5.2.1",
+    "express-rate-limit": "8.7.1",
     "helmet": "8.3.0",
+    "jose": "6.2.12",
     "mongoose": "9.11.0"
   },
   "devDependencies": {

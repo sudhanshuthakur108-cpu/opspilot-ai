@@ -50,7 +50,7 @@ This approach is **unverified**. The deployment phases must confirm that the Ver
 - has a proxy timeout long enough for AI calls and Render cold starts;
 - passes the real client IP through to Express, so rate limiting works.
 
-**Fallback if the rewrite is unsuitable:** serve the client and API from subdomains of one custom domain, for example `app.<domain>` and `api.<domain>`. These count as the same site, so `SameSite=Lax` cookies still work. The API would then use credentialed CORS restricted to `CLIENT_ORIGIN`.
+**Fallback if the rewrite is unsuitable:** serve the client and API from subdomains of one custom domain, for example `app.<domain>` and `api.<domain>`. These count as the same site, so `SameSite=Strict` cookies still work. The API would then use credentialed CORS restricted to `CLIENT_ORIGIN`.
 
 Calling the default `*.onrender.com` API directly from a `*.vercel.app` page is **not** a viable fallback for cookie auth. Those are different sites, so it would need `SameSite=None` cookies, which some browsers block as third-party cookies.
 
@@ -113,7 +113,7 @@ All routes are planned and prefixed with `/api/v1`. Routes for organization-owne
 | Group | Planned routes | Access |
 | --- | --- | --- |
 | **Health** | `GET /health` (liveness; **implemented**)<br>`GET /ready` (readiness; **implemented**: reports the MongoDB connection state when a database is configured, with 503 when it is not connected) | Public |
-| **Auth** | `POST /auth/register`<br>`POST /auth/login`<br>`POST /auth/logout`<br>`GET /auth/me` | Public, except `logout` and `me` |
+| **Auth** (**implemented**) | `POST /auth/register`<br>`POST /auth/login`<br>`POST /auth/logout`<br>`GET /auth/me` | Public, except `me`. `logout` works with or without a valid session. All return 503 when no database is configured. |
 | **Organizations** | `GET /orgs` (my organizations)<br>`POST /orgs`<br>`GET /orgs/:orgId`<br>`PATCH /orgs/:orgId`<br>`GET /orgs/:orgId/members` | Authenticated; member of the org; changes need an admin role |
 | **Customers** | `GET`, `POST /orgs/:orgId/customers`<br>`GET`, `PATCH`, `DELETE /orgs/:orgId/customers/:id` | Org member |
 | **Orders** | `GET`, `POST /orgs/:orgId/orders`<br>`GET`, `PATCH`, `DELETE /orgs/:orgId/orders/:id` | Org member |
@@ -170,12 +170,12 @@ sequenceDiagram
 
 ## 5. Authentication and Organization Isolation
 
-### Authentication (planned)
+### Authentication (implemented; not yet verified against a real database or in deployment)
 
-- **Passwords** are hashed with a vetted, slow hashing algorithm (*candidates:* argon2id or bcrypt) and are never logged or returned.
-- **Sessions** use a signed JWT stored in an `httpOnly` cookie set with `Path=/`, `SameSite=Lax`, and `Secure` in production.
-  - Verification pins the expected signing algorithm (for example HS256 with `JWT_SECRET`) and rejects anything else.
-  - The token's expiry and the cookie's max age use the same lifetime. The exact value will be decided in Phase 4.
+- **Passwords** are hashed with Argon2id (`@node-rs/argon2`: 19 MiB memory, 2 iterations, 1 lane) and are never logged or returned. Registration requires 8–128 characters.
+- **Sessions** use a signed JWT stored in an `httpOnly` cookie set with `Path=/`, `SameSite=Strict`, and `Secure` in production. `Strict` costs nothing here because the client and API share an origin.
+  - Verification accepts only HS256 with `JWT_SECRET` and requires the `sub`, `iat`, `exp` and `iss` claims.
+  - The token's expiry and the cookie's max age are both 8 hours.
   - Tokens are never stored in `localStorage` or exposed to client JavaScript.
 - **Expiry:** an expired or invalid token gets a 401. The client then clears its user state and shows the login page. There are no refresh tokens at first, so users sign in again, which keeps the design simple for a solo developer.
 - **Logout and invalidation:**
@@ -186,8 +186,9 @@ sequenceDiagram
   - `GET` and `HEAD` routes never change state.
   - State-changing requests must use `Content-Type: application/json` (otherwise 415).
   - They must also send an `Origin` header that matches `CLIENT_ORIGIN`; a missing or different `Origin` gets a 403.
-  - Together with `SameSite=Lax` cookies, these rules block cross-site form and fetch attacks.
-- **Brute-force protection:** login and register are rate limited by client IP, which needs the correct `trust proxy` setting (see [Section 6](#error-handling-planned)). Login is also limited per account. Login failures return a generic message that does not reveal whether the email exists.
+  - Together with `SameSite=Strict` cookies, these rules block cross-site form and fetch attacks.
+- **Brute-force protection:** login and register share a limit of 10 attempts per client IP per 15 minutes (in memory, per instance). The IP is only correct once the `trust proxy` setting is configured (see [Section 6](#error-handling-planned)). A per-account login limit is still planned. Login failures return a generic message that does not reveal whether the email exists, and an unknown email still runs a full password verification so response timing is similar.
+- **Registration** returns 409 for an email that is already registered. This reveals that the account exists, which cannot be avoided without email verification; the rate limit slows scanning.
 
 ### Organization-level data isolation (planned)
 
@@ -216,12 +217,12 @@ sequenceDiagram
 | `PORT` | Server | No | In use; in `server/.env.example` (defaults to `3000`; Render sets this automatically) |
 | `VITE_API_BASE_URL` | Client | No | In use; in `client/.env.example` (defaults to `/api/v1`) |
 | `API_PROXY_TARGET` | Vite dev server config only (not bundled) | No | In use; in `client/.env.example` (defaults to `http://localhost:3000`) |
-| `CLIENT_ORIGIN` | Server | No | Planned (used for the Origin check and the CORS fallback) |
+| `CLIENT_ORIGIN` | Server | No | In use; in `server/.env.example` (Origin check; defaults to `http://localhost:5173` outside production; required, https, in production) |
 | `MONGODB_URI` | Server | **Yes** | In use; in `server/.env.example` (required in production, optional in development and test) |
 | `AI_PROVIDER` | Server | No | Planned (`mock` or `openai`) |
 | `OPENAI_API_KEY` | Server | **Yes** | Planned |
 | `OPENAI_MODEL` | Server | No | Planned |
-| `JWT_SECRET` | Server | **Yes** | Planned for the auth phase, with a minimum length checked at startup |
+| `JWT_SECRET` | Server | **Yes** | In use; in `server/.env.example` (at least 32 characters, required when `MONGODB_URI` is set) |
 
 Planned variables are added to `server/.env.example` in the phase that first uses them.
 
@@ -231,7 +232,7 @@ Planned variables are added to `server/.env.example` in the phase that first use
 
 ### Input validation (planned)
 
-- Every route validates `body`, `params` and `query` against a schema before the controller runs (*candidate:* Zod). Unknown fields are stripped and string lengths are limited.
+- Every route validates `body`, `params` and `query` before the controller runs. The auth routes use small hand-written validators that read only the fields they need and limit lengths. A schema library (*candidate:* Zod) is still to be decided once routes have larger bodies.
 - Route IDs are checked to be valid ObjectIds.
 - Mongoose `sanitizeFilter` is enabled (set when the database connects) to block query-operator injection (for example `{ "$gt": "" }`).
 - Text sent to the AI provider is size-limited. AI output is checked for shape and length, and is shown in the client as plain text, never as HTML.
@@ -296,10 +297,10 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | --- | --- | --- |
 | **0. Foundation** (**Done**) | README, CLAUDE.md, .gitignore, .env.example | Files are reviewed and committed |
 | **0b. Architecture doc** (**Done**) | This document | Reviewed and committed |
-| **1. Server skeleton** (**Done**; choosing the request-validation library is deferred to Phase 4, the first phase that validates request bodies) | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
+| **1. Server skeleton** (**Done**; a request-validation library is still undecided, see Section 6) | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
 | **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
-| **4. Auth** | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
+| **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
 | **5. Organizations and isolation** | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
 | **6. Audit log service** | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
 | **7. Customers** | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |

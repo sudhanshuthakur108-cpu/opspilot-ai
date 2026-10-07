@@ -2,25 +2,41 @@ import { describe, expect, it } from 'vitest';
 import { loadConfig } from './env.js';
 
 describe('loadConfig', () => {
+  const DEVELOPMENT_DEFAULTS = {
+    nodeEnv: 'development',
+    port: 3000,
+    clientOrigin: 'http://localhost:5173',
+    database: { uri: null },
+    auth: { jwtSecret: null },
+  };
+
   it('uses development defaults when nothing is set', () => {
-    expect(loadConfig({})).toEqual({ nodeEnv: 'development', port: 3000, database: { uri: null } });
+    expect(loadConfig({})).toEqual(DEVELOPMENT_DEFAULTS);
   });
 
   it('treats empty values as unset', () => {
-    expect(loadConfig({ NODE_ENV: '', PORT: '', MONGODB_URI: '' })).toEqual({
-      nodeEnv: 'development',
-      port: 3000,
-      database: { uri: null },
-    });
+    expect(loadConfig({ NODE_ENV: '', PORT: '', MONGODB_URI: '', CLIENT_ORIGIN: '', JWT_SECRET: '' })).toEqual(
+      DEVELOPMENT_DEFAULTS,
+    );
   });
 
   it('reads valid values', () => {
+    const jwtSecret = 'x'.repeat(32);
+
     expect(
-      loadConfig({ NODE_ENV: 'production', PORT: '8080', MONGODB_URI: 'mongodb://127.0.0.1:27017/opspilot' }),
+      loadConfig({
+        NODE_ENV: 'production',
+        PORT: '8080',
+        CLIENT_ORIGIN: 'https://app.example.com',
+        MONGODB_URI: 'mongodb://127.0.0.1:27017/opspilot',
+        JWT_SECRET: jwtSecret,
+      }),
     ).toEqual({
       nodeEnv: 'production',
       port: 8080,
+      clientOrigin: 'https://app.example.com',
       database: { uri: 'mongodb://127.0.0.1:27017/opspilot' },
+      auth: { jwtSecret },
     });
   });
 

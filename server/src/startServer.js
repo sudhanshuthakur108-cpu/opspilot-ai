@@ -8,8 +8,8 @@ function listen(app, port) {
 }
 
 // Connects required dependencies before accepting traffic, so a server that is
-// listening is never missing its database.
-export async function startServer({ config, logger, database }) {
+// listening is never missing its database. Authentication is enabled with the database.
+export async function startServer({ config, logger, database, users }) {
   const databaseEnabled = Boolean(config.database.uri);
 
   if (databaseEnabled) {
@@ -19,7 +19,14 @@ export async function startServer({ config, logger, database }) {
     logger.info('database disabled: MONGODB_URI is not set');
   }
 
-  const app = createApp({ logger, databaseState: databaseEnabled ? database.state : undefined });
+  const app = createApp({
+    logger,
+    clientOrigin: config.clientOrigin,
+    databaseState: databaseEnabled ? database.state : undefined,
+    auth: databaseEnabled
+      ? { users, secret: config.auth.jwtSecret, secureCookie: config.nodeEnv === 'production' }
+      : undefined,
+  });
   const server = await listen(app, config.port);
   logger.info('server started', { port: server.address().port, nodeEnv: config.nodeEnv });
 

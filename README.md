@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses and an optional MongoDB connection (no data models yet), plus a React page that shows the API's status. None of the product features below are implemented yet.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, and cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`; requires the database), plus a React page that shows the API's status. The client has no sign-in screens yet, and none of the product features below are implemented.
 
 ## Planned Scope
 
@@ -22,7 +22,8 @@ Record fields, statuses, roles and permissions are not decided yet. They are tra
 | Frontend | React 19, Vite 8, plain CSS                                  | In use  |
 | Backend  | Node.js, Express 5 (REST API), helmet                        | In use  |
 | Testing  | Vitest, Supertest, React Testing Library (jsdom)             | In use  |
-| Database | MongoDB through Mongoose 9 (connection only; no models yet)  | In use  |
+| Database | MongoDB through Mongoose 9 (user accounts only so far)       | In use  |
+| Auth     | Argon2id (`@node-rs/argon2`), JWT session cookie (`jose`), `express-rate-limit` | In use |
 | AI       | Server-side provider interface: `mock` (default) or `openai` | Planned |
 
 Other libraries, such as request validation and password hashing, are listed as candidates in the architecture document. They will be chosen in the phase that first needs them.
@@ -64,9 +65,9 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 │   ├── src/
 │   │   ├── config/       # environment validation
 │   │   ├── lib/          # database connection, logger, error class, redaction
-│   │   ├── middleware/   # request IDs, request logging, 404 and error handling
-│   │   ├── testing/      # test helpers
-│   │   ├── modules/      # feature modules (currently: health)
+│   │   ├── middleware/   # request IDs, logging, same-origin check, 404 and errors
+│   │   ├── testing/      # test helpers (logger and user-store stand-ins)
+│   │   ├── modules/      # feature modules (health, auth, users)
 │   │   ├── app.js        # builds the Express app (used by tests)
 │   │   └── server.js     # validates config and starts listening
 │   └── .env.example
@@ -111,6 +112,8 @@ cp client/.env.example client/.env
 | `NODE_ENV`          | server              | `development`, `test` or `production` (default `development`) |
 | `PORT`              | server              | Port the API listens on (default `3000`)                    |
 | `MONGODB_URI`       | server              | MongoDB connection string (**secret**; required in production) |
+| `JWT_SECRET`        | server              | Signs session tokens (**secret**; 32+ characters; required when `MONGODB_URI` is set) |
+| `CLIENT_ORIGIN`     | server              | Origin allowed to make state-changing requests (default `http://localhost:5173`; required in production) |
 | `VITE_API_BASE_URL` | client              | API base path or URL (default `/api/v1`); bundled into the browser code |
 | `API_PROXY_TARGET`  | client (dev server) | Where Vite proxies `/api` (default `http://localhost:3000`); not bundled |
 
@@ -118,7 +121,9 @@ The server checks its configuration at startup and exits with a clear message if
 
 `MONGODB_URI` is optional in development and test; leave it empty to run without a database. It is required when `NODE_ENV=production`. When it is set, the server does not start until it connects, and `GET /api/v1/ready` returns 503 while the connection is down. The connection string is never logged.
 
-Variables for later phases, including `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `CLIENT_ORIGIN` and `JWT_SECRET`, will be added to `server/.env.example` when they are first used.
+Authentication is enabled together with the database, so setting `MONGODB_URI` also requires `JWT_SECRET`. State-changing requests must come from `CLIENT_ORIGIN`, so open the app at exactly that origin (`http://localhost:5173`, not `127.0.0.1`).
+
+Variables for later phases, including `AI_PROVIDER`, `OPENAI_API_KEY` and `OPENAI_MODEL`, will be added to `server/.env.example` when they are first used.
 
 Rules:
 

@@ -1,3 +1,4 @@
+import { readAuthConfig } from './auth.js';
 import { readDatabaseConfig } from './database.js';
 
 const NODE_ENVS = ['development', 'test', 'production'];
@@ -20,9 +21,22 @@ export function loadConfig(env = process.env) {
   const { database, errors: databaseErrors } = readDatabaseConfig(env, nodeEnv);
   errors.push(...databaseErrors);
 
+  const {
+    clientOrigin,
+    auth,
+    errors: authErrors,
+  } = readAuthConfig(env, nodeEnv, { databaseEnabled: Boolean(database.uri) });
+  errors.push(...authErrors);
+
   if (errors.length > 0) {
     throw new Error(`Invalid server configuration:\n- ${errors.join('\n- ')}`);
   }
 
-  return Object.freeze({ nodeEnv, port, database: Object.freeze(database) });
+  return Object.freeze({
+    nodeEnv,
+    port,
+    clientOrigin,
+    database: Object.freeze(database),
+    auth: Object.freeze(auth),
+  });
 }

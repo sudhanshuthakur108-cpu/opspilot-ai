@@ -2,6 +2,7 @@ import { loadConfig } from './config/env.js';
 import { connectDatabase, databaseState, disconnectDatabase } from './lib/database.js';
 import { logger } from './lib/logger.js';
 import { redactConnectionStrings } from './lib/redact.js';
+import { userStore } from './modules/users/user.store.js';
 import { startServer } from './startServer.js';
 
 // Hosting platforms wait a limited time after SIGTERM before killing the process.
@@ -25,6 +26,7 @@ try {
     config,
     logger,
     database: { connect: connectDatabase, state: databaseState, disconnect: disconnectDatabase },
+    users: userStore,
   }));
 } catch (error) {
   logger.error('startup failed', { error: errorFields(error) });

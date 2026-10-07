@@ -1,0 +1,36 @@
+import { randomBytes } from 'node:crypto';
+
+// In-memory stand-in for modules/users/user.store.js, with the same contract
+// (including returning null for a duplicate email). `records` exposes stored data to tests.
+export function createMemoryUserStore() {
+  const records = new Map();
+
+  const withoutHash = ({ passwordHash, ...user }) => ({ ...user });
+
+  return {
+    records,
+
+    async create({ email, passwordHash }) {
+      if ([...records.values()].some((record) => record.email === email)) {
+        return null;
+      }
+      const record = { id: randomBytes(12).toString('hex'), email, passwordHash, tokenVersion: 0, createdAt: new Date() };
+      records.set(record.id, record);
+      return withoutHash(record);
+    },
+
+    async findByEmailWithPassword(email) {
+      const record = [...records.values()].find((candidate) => candidate.email === email);
+      return record ? { ...record } : null;
+    },
+
+    async findById(id) {
+      const record = records.get(id);
+      return record ? withoutHash(record) : null;
+    },
+
+    async incrementTokenVersion(id) {
+      records.get(id).tokenVersion += 1;
+    },
+  };
+}
