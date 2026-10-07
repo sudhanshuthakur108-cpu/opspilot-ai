@@ -1,4 +1,5 @@
 import { HttpError } from '../lib/httpError.js';
+import { redactConnectionStrings } from '../lib/redact.js';
 
 // Errors raised by Express's body parser, identified by their `type`.
 // Their own messages can echo parser internals, so we send fixed messages instead.
@@ -43,7 +44,11 @@ export function createErrorHandler(logger) {
       // Log selected fields only: some errors carry request data (e.g. parser errors keep the raw body).
       logger.error('request failed', {
         requestId: req.id,
-        error: { name: err.name, message: err.message, stack: err.stack },
+        error: {
+          name: err.name,
+          message: redactConnectionStrings(err.message),
+          stack: redactConnectionStrings(err.stack),
+        },
       });
     }
 

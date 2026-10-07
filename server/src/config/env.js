@@ -1,3 +1,5 @@
+import { readDatabaseConfig } from './database.js';
+
 const NODE_ENVS = ['development', 'test', 'production'];
 const DEFAULT_PORT = 3000;
 
@@ -15,9 +17,12 @@ export function loadConfig(env = process.env) {
     errors.push(`PORT must be a whole number between 1 and 65535 (got "${portValue}")`);
   }
 
+  const { database, errors: databaseErrors } = readDatabaseConfig(env, nodeEnv);
+  errors.push(...databaseErrors);
+
   if (errors.length > 0) {
     throw new Error(`Invalid server configuration:\n- ${errors.join('\n- ')}`);
   }
 
-  return Object.freeze({ nodeEnv, port });
+  return Object.freeze({ nodeEnv, port, database: Object.freeze(database) });
 }

@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "express": "5.2.1",
-    "helmet": "8.3.0"
+    "helmet": "8.3.0",
+    "mongoose": "9.11.0"
   },
   "devDependencies": {
     "supertest": "7.3.1",

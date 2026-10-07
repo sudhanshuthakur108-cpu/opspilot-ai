@@ -112,7 +112,7 @@ All routes are planned and prefixed with `/api/v1`. Routes for organization-owne
 
 | Group | Planned routes | Access |
 | --- | --- | --- |
-| **Health** | `GET /health` (liveness; **implemented**)<br>`GET /ready` (readiness; **implemented** with no dependency checks yet; a database ping and a 503 on failure are added with MongoDB) | Public |
+| **Health** | `GET /health` (liveness; **implemented**)<br>`GET /ready` (readiness; **implemented**: reports the MongoDB connection state when a database is configured, with 503 when it is not connected) | Public |
 | **Auth** | `POST /auth/register`<br>`POST /auth/login`<br>`POST /auth/logout`<br>`GET /auth/me` | Public, except `logout` and `me` |
 | **Organizations** | `GET /orgs` (my organizations)<br>`POST /orgs`<br>`GET /orgs/:orgId`<br>`PATCH /orgs/:orgId`<br>`GET /orgs/:orgId/members` | Authenticated; member of the org; changes need an admin role |
 | **Customers** | `GET`, `POST /orgs/:orgId/customers`<br>`GET`, `PATCH`, `DELETE /orgs/:orgId/customers/:id` | Org member |
@@ -217,7 +217,7 @@ sequenceDiagram
 | `VITE_API_BASE_URL` | Client | No | In use; in `client/.env.example` (defaults to `/api/v1`) |
 | `API_PROXY_TARGET` | Vite dev server config only (not bundled) | No | In use; in `client/.env.example` (defaults to `http://localhost:3000`) |
 | `CLIENT_ORIGIN` | Server | No | Planned (used for the Origin check and the CORS fallback) |
-| `MONGODB_URI` | Server | **Yes** | Planned |
+| `MONGODB_URI` | Server | **Yes** | In use; in `server/.env.example` (required in production, optional in development and test) |
 | `AI_PROVIDER` | Server | No | Planned (`mock` or `openai`) |
 | `OPENAI_API_KEY` | Server | **Yes** | Planned |
 | `OPENAI_MODEL` | Server | No | Planned |
@@ -233,7 +233,7 @@ Planned variables are added to `server/.env.example` in the phase that first use
 
 - Every route validates `body`, `params` and `query` against a schema before the controller runs (*candidate:* Zod). Unknown fields are stripped and string lengths are limited.
 - Route IDs are checked to be valid ObjectIds.
-- Mongoose `sanitizeFilter` is enabled to block query-operator injection (for example `{ "$gt": "" }`).
+- Mongoose `sanitizeFilter` is enabled (set when the database connects) to block query-operator injection (for example `{ "$gt": "" }`).
 - Text sent to the AI provider is size-limited. AI output is checked for shape and length, and is shown in the client as plain text, never as HTML.
 - Client-side checks exist only to improve usability. The server is the authority.
 

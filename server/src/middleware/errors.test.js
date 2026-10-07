@@ -44,9 +44,10 @@ describe('centralized error handler', () => {
       level: 'error',
       message: 'request failed',
       requestId: response.headers['x-request-id'],
-      error: { name: 'Error', message: error.message },
+      error: { name: 'Error', message: 'connect failed for mongodb://[redacted]' },
     });
     expect(logs.entries[0].error.stack).toContain('Error: connect failed');
+    expect(JSON.stringify(logs.entries)).not.toContain('hunter2');
   });
 
   it('sends the code and message of an HttpError without logging it', async () => {

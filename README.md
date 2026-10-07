@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs and JSON error responses, plus a React page that shows the API's status. None of the product features below are implemented yet.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses and an optional MongoDB connection (no data models yet), plus a React page that shows the API's status. None of the product features below are implemented yet.
 
 ## Planned Scope
 
@@ -22,7 +22,7 @@ Record fields, statuses, roles and permissions are not decided yet. They are tra
 | Frontend | React 19, Vite 8, plain CSS                                  | In use  |
 | Backend  | Node.js, Express 5 (REST API), helmet                        | In use  |
 | Testing  | Vitest, Supertest, React Testing Library (jsdom)             | In use  |
-| Database | MongoDB Atlas, accessed through Mongoose                     | Planned |
+| Database | MongoDB through Mongoose 9 (connection only; no models yet)  | In use  |
 | AI       | Server-side provider interface: `mock` (default) or `openai` | Planned |
 
 Other libraries, such as request validation and password hashing, are listed as candidates in the architecture document. They will be chosen in the phase that first needs them.
@@ -63,7 +63,7 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 ├── server/               # Express API
 │   ├── src/
 │   │   ├── config/       # environment validation
-│   │   ├── lib/          # logger and error class
+│   │   ├── lib/          # database connection, logger, error class, redaction
 │   │   ├── middleware/   # request IDs, request logging, 404 and error handling
 │   │   ├── testing/      # test helpers
 │   │   ├── modules/      # feature modules (currently: health)
@@ -110,12 +110,15 @@ cp client/.env.example client/.env
 | ------------------- | ------------------- | ---------------------------------------------------------- |
 | `NODE_ENV`          | server              | `development`, `test` or `production` (default `development`) |
 | `PORT`              | server              | Port the API listens on (default `3000`)                    |
+| `MONGODB_URI`       | server              | MongoDB connection string (**secret**; required in production) |
 | `VITE_API_BASE_URL` | client              | API base path or URL (default `/api/v1`); bundled into the browser code |
 | `API_PROXY_TARGET`  | client (dev server) | Where Vite proxies `/api` (default `http://localhost:3000`); not bundled |
 
 The server checks its configuration at startup and exits with a clear message if a value is invalid. If you change `PORT`, update `API_PROXY_TARGET` to match.
 
-Variables for later phases, including `MONGODB_URI`, `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `CLIENT_ORIGIN` and `JWT_SECRET`, will be added to `server/.env.example` when they are first used.
+`MONGODB_URI` is optional in development and test; leave it empty to run without a database. It is required when `NODE_ENV=production`. When it is set, the server does not start until it connects, and `GET /api/v1/ready` returns 503 while the connection is down. The connection string is never logged.
+
+Variables for later phases, including `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `CLIENT_ORIGIN` and `JWT_SECRET`, will be added to `server/.env.example` when they are first used.
 
 Rules:
 

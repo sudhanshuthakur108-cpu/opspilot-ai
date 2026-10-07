@@ -24,12 +24,40 @@ describe('GET /api/v1/health', () => {
 });
 
 describe('GET /api/v1/ready', () => {
-  it('reports ready with no dependency checks yet', async () => {
+  it('reports ready with no checks when the database is disabled', async () => {
     const response = await request(app).get('/api/v1/ready');
 
     expect(response.status).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
     expect(response.body).toEqual({ status: 'ready', checks: {} });
+  });
+
+  it('reports ready when the database is connected', async () => {
+    const withDatabase = createApp({ logger: captureLogger(), databaseState: () => 'connected' });
+
+    const response = await request(withDatabase).get('/api/v1/ready');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ready', checks: { database: 'connected' } });
+  });
+
+  it.each(['disconnected', 'connecting', 'disconnecting'])('returns 503 when the database is %s', async (state) => {
+    const withDatabase = createApp({ logger: captureLogger(), databaseState: () => state });
+
+    const response = await request(withDatabase).get('/api/v1/ready');
+
+    expect(response.status).toBe(503);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toEqual({ status: 'not_ready', checks: { database: state } });
+  });
+
+  it('does not let a database outage affect liveness', async () => {
+    const withDatabase = createApp({ logger: captureLogger(), databaseState: () => 'disconnected' });
+
+    const response = await request(withDatabase).get('/api/v1/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
   });
 });
 
