@@ -1,6 +1,6 @@
 # OpsPilot AI: Architecture
 
-> **Status: planned architecture.** Nothing in this document is implemented yet unless it is explicitly marked **Done**. Library names marked as *candidates* are not installed and will be confirmed in the phase that first needs them.
+> **Status: planned architecture.** Nothing in this document is implemented yet unless it is explicitly marked **Done**. Library names marked as *candidates* are not installed and will be confirmed in the phase that first needs them. The initial scaffold confirmed Express 5, helmet, Vitest, Supertest, and React Testing Library with jsdom.
 
 ## 1. System Overview
 
@@ -80,14 +80,15 @@ opspilot-ai/
 │           └── customers/     # e.g. routes, controller, service, model, schemas, tests
 ├── docs/
 │   └── ARCHITECTURE.md
-├── .env.example
+├── package.json           # npm workspaces and root scripts
 ├── CLAUDE.md
 └── README.md
 ```
 
 - Each domain module owns its routes, controller, service, Mongoose model and validation schemas, in line with the modular-code rule in `CLAUDE.md`.
 - Splitting `app.js` from `server.js` lets HTTP tests run the app without opening a port or connecting to a real database.
-- A root `package.json` using npm workspaces is planned for convenience scripts (for example, running both apps in development). No `package.json` exists yet.
+- A root `package.json` uses npm workspaces for `client` and `server`, with scripts to run both apps in development, run all tests, and build the client.
+- Each app has its own `.env.example`.
 
 ## 3. Responsibilities and Boundaries (Planned)
 
@@ -211,17 +212,20 @@ sequenceDiagram
 
 | Variable | Used by | Secret | Status |
 | --- | --- | --- | --- |
-| `NODE_ENV` | Server | No | In `.env.example` |
-| `PORT` | Server | No | In `.env.example` (Render sets this automatically) |
-| `CLIENT_ORIGIN` | Server | No | In `.env.example` (used for the Origin check and the CORS fallback) |
-| `MONGODB_URI` | Server | **Yes** | In `.env.example` |
-| `AI_PROVIDER` | Server | No | In `.env.example` (`mock` or `openai`) |
-| `OPENAI_API_KEY` | Server | **Yes** | In `.env.example` |
-| `OPENAI_MODEL` | Server | No | In `.env.example` |
-| `VITE_API_BASE_URL` | Client | No | In `.env.example` (can default to `/api/v1` when using the proxy) |
-| `JWT_SECRET` | Server | **Yes** | Planned; to be added to `.env.example` in the auth phase, with a minimum length checked at startup |
+| `NODE_ENV` | Server | No | In use; in `server/.env.example` (defaults to `development`) |
+| `PORT` | Server | No | In use; in `server/.env.example` (defaults to `3000`; Render sets this automatically) |
+| `VITE_API_BASE_URL` | Client | No | In use; in `client/.env.example` (defaults to `/api/v1`) |
+| `API_PROXY_TARGET` | Vite dev server config only (not bundled) | No | In use; in `client/.env.example` (defaults to `http://localhost:3000`) |
+| `CLIENT_ORIGIN` | Server | No | Planned (used for the Origin check and the CORS fallback) |
+| `MONGODB_URI` | Server | **Yes** | Planned |
+| `AI_PROVIDER` | Server | No | Planned (`mock` or `openai`) |
+| `OPENAI_API_KEY` | Server | **Yes** | Planned |
+| `OPENAI_MODEL` | Server | No | Planned |
+| `JWT_SECRET` | Server | **Yes** | Planned for the auth phase, with a minimum length checked at startup |
 
-**Env file location:** Vite reads `.env` files from the client folder by default, not the repository root. When the apps are scaffolded, the plan is to split the root `.env.example` into `server/.env.example` and `client/.env.example`, so each app loads only its own variables.
+Planned variables are added to `server/.env.example` in the phase that first uses them.
+
+**Env file location:** each app reads its own `.env`. The server loads `server/.env` with Node's `--env-file-if-exists` flag; real environment variables take precedence over the file. Vite loads `client/.env`.
 
 **Secrets:** production secrets are set only in the Render and Vercel dashboards. The Atlas database user gets read/write access to the application database only. Secrets are never logged, sent to the client, or included in error responses.
 
@@ -235,7 +239,7 @@ sequenceDiagram
 
 ### Error handling (planned)
 
-- A central Express error handler maps known errors to status codes and the standard error envelope. (*Candidate:* Express 5, which passes errors from async route handlers to this handler automatically. If Express 4 is chosen, each async handler needs a small wrapper to do this.)
+- A central Express error handler maps known errors to status codes and the standard error envelope. Express 5, confirmed in the scaffold, passes errors from async route handlers to this handler automatically.
 
   | Status | Meaning |
   | --- | --- |
@@ -250,21 +254,21 @@ sequenceDiagram
 
 - Each request gets an ID that is included in logs and error responses so problems can be traced.
 - Structured server logs redact passwords, tokens, cookies and API keys.
-- Other baseline protections: security headers (*candidate:* helmet), a request body size limit, and a timeout on outbound AI calls.
+- Other baseline protections: security headers (helmet, in place), plus a request body size limit and a timeout on outbound AI calls (both planned).
 - Express's `trust proxy` setting must match the real proxy chain (Vercel rewrite, then Render). This makes the client IP used for rate limiting correct and stops it being spoofed through `X-Forwarded-For`. The exact setting will be confirmed in Phase 3.
 
 ## 7. Testing and Deployment
 
 ### Testing strategy (planned)
 
-Tests focus on behavior that matters, following `CLAUDE.md`. Tooling *candidates* are Vitest (client and server), Supertest (HTTP tests) and mongodb-memory-server (an isolated test database).
+Tests focus on behavior that matters, following `CLAUDE.md`. Vitest runs both test suites. The server uses Supertest for HTTP tests, and the client uses React Testing Library with jsdom. mongodb-memory-server (an isolated test database) remains a *candidate*.
 
 | Level | Focus |
 | --- | --- |
 | Unit | Validation schemas, service logic, config validation, the mock AI provider's deterministic output |
 | API integration | Status codes and response shapes, 401/403/404 paths, organization isolation, approval state transitions, audit log writes |
 | AI provider | The `openai` provider tested with a mocked HTTP layer. **Automated tests never call the real OpenAI API.** |
-| Client | Key components and forms (*candidate:* React Testing Library), with API calls mocked |
+| Client | Key components and forms (React Testing Library), with API calls mocked |
 
 Tests for code that uses MongoDB transactions need a replica-set test database, because a standalone instance does not support transactions. mongodb-memory-server has a replica-set mode for this.
 
@@ -286,14 +290,14 @@ To verify at deployment time:
 
 ## 8. Implementation Roadmap
 
-Each phase is small and has a testable **done when** condition. Nothing past Phase 0 is started.
+Each phase is small and has a testable **done when** condition. Phases 1 and 2 are in progress; nothing later is started.
 
 | Phase | Scope | Done when |
 | --- | --- | --- |
 | **0. Foundation** (**Done**) | README, CLAUDE.md, .gitignore, .env.example | Files are reviewed and committed |
-| **0b. Architecture doc** | This document | Reviewed and committed |
-| **1. Server skeleton** | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
-| **2. Client skeleton** | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
+| **0b. Architecture doc** (**Done**) | This document | Reviewed and committed |
+| **1. Server skeleton** (**In progress**: liveness route, config validation, error handler and tests are in place; the readiness route, request IDs and logging are not) | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
+| **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
 | **5. Organizations and isolation** | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |

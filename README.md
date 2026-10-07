@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: pre-development.** The repository contains only the project foundation (configuration and engineering rules) and the architecture documentation. There is no application code yet, and none of the features below are implemented.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with a health endpoint (`GET /api/v1/health`) and a React page that shows the API's status. None of the product features below are implemented yet.
 
 ## Planned Scope
 
@@ -15,16 +15,17 @@ OpsPilot AI is a planned operations management SaaS for teams. Teams will be abl
 
 Record fields, statuses, roles and permissions are not decided yet. They are tracked as [open questions](docs/ARCHITECTURE.md#9-open-questions).
 
-## Planned Stack
+## Stack
 
-| Layer    | Technology                                                    |
-| -------- | ------------------------------------------------------------- |
-| Frontend | React, Vite, plain CSS                                        |
-| Backend  | Node.js, Express (REST API)                                   |
-| Database | MongoDB Atlas, accessed through Mongoose                      |
-| AI       | Server-side provider interface: `mock` (default) or `openai`  |
+| Layer    | Technology                                                   | Status  |
+| -------- | ------------------------------------------------------------ | ------- |
+| Frontend | React 19, Vite 8, plain CSS                                  | In use  |
+| Backend  | Node.js, Express 5 (REST API), helmet                        | In use  |
+| Testing  | Vitest, Supertest, React Testing Library (jsdom)             | In use  |
+| Database | MongoDB Atlas, accessed through Mongoose                     | Planned |
+| AI       | Server-side provider interface: `mock` (default) or `openai` | Planned |
 
-Other libraries (validation, testing, security middleware) are listed as candidates in the architecture document. They will be chosen when the code is scaffolded.
+Other libraries, such as request validation and password hashing, are listed as candidates in the architecture document. They will be chosen in the phase that first needs them.
 
 ### AI Providers
 
@@ -51,48 +52,68 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 
 ## Repository Layout
 
-Current contents:
-
 ```text
 .
+├── client/               # React + Vite frontend
+│   ├── src/
+│   │   ├── api/          # API request functions
+│   │   ├── features/     # feature folders (currently: health)
+│   │   └── styles/       # global CSS
+│   └── .env.example
+├── server/               # Express API
+│   ├── src/
+│   │   ├── config/       # environment validation
+│   │   ├── middleware/   # 404 and error handling
+│   │   ├── modules/      # feature modules (currently: health)
+│   │   ├── app.js        # builds the Express app (used by tests)
+│   │   └── server.js     # validates config and starts listening
+│   └── .env.example
 ├── docs/
 │   └── ARCHITECTURE.md   # system design and roadmap
-├── .env.example          # environment variable names (placeholders only)
-├── .gitignore
 ├── CLAUDE.md             # engineering rules for this project
-└── README.md
+└── package.json          # npm workspaces and root scripts
 ```
 
-The `client/` (React + Vite) and `server/` (Express) folders will be added in the first implementation phases.
-
 ## Getting Started
+
+Requires Node.js `^22.22.2` or `>=24.15.0` (see `engines` in `package.json`) and npm.
 
 ```bash
 git clone https://github.com/sudhanshuthakur108-cpu/opspilot-ai.git
 cd opspilot-ai
+npm install
+npm run dev
 ```
 
-There is nothing to install or run yet. The required Node.js version and the commands for installing, running and testing the apps will be documented here once they exist.
+`npm run dev` starts the API on <http://localhost:3000> and the Vite dev server on <http://localhost:5173>. Open the Vite URL; it proxies `/api` requests to the API.
+
+Other scripts, run from the repository root:
+
+| Command         | What it does                                                       |
+| --------------- | ------------------------------------------------------------------ |
+| `npm test`      | Runs the server tests, then the client tests                       |
+| `npm run build` | Builds the client for production into `client/dist/`               |
+| `npm start -w server` | Starts the API without file watching                         |
 
 ## Configuration
 
-[`.env.example`](.env.example) lists the environment variables the apps are expected to use. It contains no real values:
+Both apps run with built-in defaults, so `.env` files are optional for local development. To change a value, copy the template for that app and edit the copy:
 
-| Variable            | Purpose                                                        |
-| ------------------- | -------------------------------------------------------------- |
-| `NODE_ENV`          | Runtime environment                                            |
-| `PORT`              | Port the API listens on (set automatically on Render)          |
-| `CLIENT_ORIGIN`     | Allowed frontend origin, used for request origin checks        |
-| `MONGODB_URI`       | MongoDB connection string (**secret**)                         |
-| `AI_PROVIDER`       | `mock` (default) or `openai`                                   |
-| `OPENAI_API_KEY`    | OpenAI API key, needed only when `AI_PROVIDER=openai` (**secret**) |
-| `OPENAI_MODEL`      | OpenAI model name, needed only when `AI_PROVIDER=openai`       |
-| `VITE_API_BASE_URL` | API base URL for the frontend (public, bundled into the client) |
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
 
-Planned changes:
+| Variable            | App                 | Purpose                                                    |
+| ------------------- | ------------------- | ---------------------------------------------------------- |
+| `NODE_ENV`          | server              | `development`, `test` or `production` (default `development`) |
+| `PORT`              | server              | Port the API listens on (default `3000`)                    |
+| `VITE_API_BASE_URL` | client              | API base path or URL (default `/api/v1`); bundled into the browser code |
+| `API_PROXY_TARGET`  | client (dev server) | Where Vite proxies `/api` (default `http://localhost:3000`); not bundled |
 
-- When the apps are scaffolded, this file will be split into `server/.env.example` and `client/.env.example`. Each will be copied to a local, Git-ignored `.env`.
-- `JWT_SECRET` will be added when authentication is built.
+The server checks its configuration at startup and exits with a clear message if a value is invalid. If you change `PORT`, update `API_PROXY_TARGET` to match.
+
+Variables for later phases, including `MONGODB_URI`, `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `CLIENT_ORIGIN` and `JWT_SECRET`, will be added to `server/.env.example` when they are first used.
 
 Rules:
 

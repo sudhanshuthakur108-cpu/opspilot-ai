@@ -1,0 +1,19 @@
+{
+  "name": "@opspilot-ai/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "5.2.1",
+    "helmet": "8.3.0"
+  },
+  "devDependencies": {
+    "supertest": "7.3.1",
+    "vitest": "5.0.3"
+  }
+}
