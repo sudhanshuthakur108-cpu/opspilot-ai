@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
+import { stubModalDialogs } from '../../testing/dialog.js';
 import { apiError, json, mockApi, requestsTo } from '../../testing/mockApi.js';
 
 const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
@@ -36,6 +37,7 @@ async function openCustomers(handlers = {}) {
   render(<App />);
   await screen.findByRole('heading', { name: 'Dashboard' });
   fireEvent.click(within(navigation()).getByRole('link', { name: 'Customers' }));
+  await screen.findByRole('heading', { level: 1, name: 'Customers' });
   return fetchMock;
 }
 
@@ -53,18 +55,7 @@ function fillIn(dialog, label, value) {
 const submit = (dialog) => fireEvent.click(dialog.getByRole('button', { name: 'Add customer' }));
 const tableRows = () => within(screen.getByRole('table')).getAllByRole('row').slice(1);
 
-// jsdom has no modal dialogs. These stand in for the two methods the form uses; the real
-// behavior (focus kept inside, Escape, focus returned on close) is checked in a browser.
-beforeAll(() => {
-  HTMLDialogElement.prototype.showModal = function showModal() {
-    this.setAttribute('open', '');
-  };
-  HTMLDialogElement.prototype.close = function close() {
-    if (!this.hasAttribute('open')) return;
-    this.removeAttribute('open');
-    this.dispatchEvent(new Event('close'));
-  };
-});
+beforeAll(stubModalDialogs);
 
 beforeEach(() => {
   vi.spyOn(Storage.prototype, 'setItem');
@@ -91,7 +82,7 @@ describe('Customers navigation', () => {
 
     fireEvent.click(dashboardLink);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
     expect(window.location.pathname).toBe('/');
   });
 
@@ -116,13 +107,13 @@ describe('Customers navigation', () => {
   });
 
   it('shows the dashboard for an address that is not a page', async () => {
-    window.history.replaceState(null, '', '/orders');
+    window.history.replaceState(null, '', '/tasks');
     mockServer();
 
     render(<App />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
-    expect(window.location.pathname).toBe('/');
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
   });
 });
 

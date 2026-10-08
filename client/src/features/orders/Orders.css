@@ -1,0 +1,63 @@
+.order-table__description {
+  min-width: 14rem;
+  color: var(--color-text);
+}
+
+.records-table .order-table__amount {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-table td.order-table__amount {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* The label carries the meaning; the color only reinforces it. */
+.order-status {
+  display: inline-block;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.375rem;
+  white-space: nowrap;
+  border-radius: 999px;
+}
+
+.order-status--pending {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.order-status--confirmed {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.order-status--completed {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.order-status--cancelled {
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.order-form__amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* Lets the fields shrink to their columns (grid items otherwise keep their content's width). */
+.order-form__amount > * {
+  min-width: 0;
+}
+
+.order-form__amount [name='currency'] {
+  text-transform: uppercase;
+}

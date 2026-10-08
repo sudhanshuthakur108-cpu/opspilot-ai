@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
 import { apiError, json, mockApi, requestsTo } from '../../testing/mockApi.js';
@@ -187,7 +187,7 @@ describe('onboarding', () => {
     const input = screen.getByLabelText('Organization name');
     expect(input.value).toBe('Acme Logistics');
     expect(input.matches(':disabled')).toBe(false);
-    expect(document.activeElement).toBe(input);
+    await waitFor(() => expect(document.activeElement).toBe(input));
     expect(screen.queryByText(/SLUG_UNAVAILABLE|server message/)).toBeNull();
   });
 

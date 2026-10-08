@@ -1,11 +1,11 @@
-import './CustomerTable.css';
+import '../../styles/records.css';
 
 const createdFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
 function NotProvided() {
   return (
     <>
-      <span className="customer-table__missing" aria-hidden="true">
+      <span className="records-table__missing" aria-hidden="true">
         —
       </span>
       <span className="visually-hidden">Not provided</span>
@@ -16,7 +16,7 @@ function NotProvided() {
 // Scrolls sideways inside its own frame on narrow screens, so it is focusable for keyboard users.
 export function CustomerTable({ customers, labelledBy, highlightId }) {
   return (
-    <div className="customer-table" role="region" aria-labelledby={labelledBy} tabIndex={0}>
+    <div className="records-table" role="region" aria-labelledby={labelledBy} tabIndex={0}>
       <table>
         <thead>
           <tr>
@@ -28,10 +28,10 @@ export function CustomerTable({ customers, labelledBy, highlightId }) {
         </thead>
         <tbody>
           {customers.map((customer) => (
-            <tr key={customer.id} className={customer.id === highlightId ? 'customer-table__row--new' : undefined}>
+            <tr key={customer.id} className={customer.id === highlightId ? 'records-table__row--new' : undefined}>
               <th scope="row">
-                <span className="customer-table__name">
-                  <span className="customer-table__avatar" aria-hidden="true">
+                <span className="records-table__name">
+                  <span className="records-table__avatar" aria-hidden="true">
                     {customer.name.charAt(0).toUpperCase()}
                   </span>
                   {customer.name}

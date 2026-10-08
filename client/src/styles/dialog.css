@@ -102,3 +102,30 @@
     animation: none;
   }
 }
+
+/* Shown in place of the form while it cannot be used yet (loading, failed, nothing to pick). */
+.dialog__notice {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+}
+
+.dialog__notice--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.dialog__notice--loading .spinner {
+  color: var(--color-primary);
+}
+
+.dialog__notice-title {
+  font-weight: 600;
+  color: var(--color-text);
+}

@@ -20,6 +20,8 @@
   --color-danger-border: #fecdca;
   --color-success: #067647;
   --color-success-soft: #e7f8ef;
+  --color-warning: #b54708;
+  --color-warning-soft: #fef6e7;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -97,6 +99,7 @@ p {
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background-color 0.15s ease,

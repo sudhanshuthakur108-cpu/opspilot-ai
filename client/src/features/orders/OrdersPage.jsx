@@ -1,27 +1,27 @@
 import { useEffect, useState } from 'react';
-import { listCustomers } from '../../api/customers.js';
 import { describeRequestError } from '../../api/errorMessages.js';
+import { listOrders } from '../../api/orders.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Icon } from '../../components/Icon.jsx';
-import { CustomerTable } from './CustomerTable.jsx';
-import { NewCustomerDialog } from './NewCustomerDialog.jsx';
+import { NewOrderDialog } from './NewOrderDialog.jsx';
+import { OrderTable } from './OrderTable.jsx';
 import '../../styles/records.css';
 
-export function CustomersPage({ organization }) {
+export function OrdersPage({ organization }) {
   const { endSession } = useAuth();
-  const [customers, setCustomers] = useState(null);
+  const [orders, setOrders] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const [adding, setAdding] = useState(false);
-  const [added, setAdded] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState(null);
 
   useEffect(() => {
     let active = true;
 
-    listCustomers(organization.id)
+    listOrders(organization.id)
       .then((list) => {
-        if (active) setCustomers(list);
+        if (active) setOrders(list);
       })
       .catch((error) => {
         if (!active) return;
@@ -42,16 +42,16 @@ export function CustomersPage({ organization }) {
     setAttempt((count) => count + 1);
   }
 
-  // The new customer comes back from the create request, so the list is not reloaded.
-  function handleCreated(customer) {
-    setCustomers((current) => [customer, ...current]);
-    setAdded(customer);
+  // The new order comes back from the create request, so the list is not reloaded.
+  function handleCreated(order) {
+    setOrders((current) => [order, ...current]);
+    setCreated(order);
   }
 
-  const addButton = (
-    <button type="button" className="button button--primary" onClick={() => setAdding(true)}>
+  const newOrderButton = (
+    <button type="button" className="button button--primary" onClick={() => setCreating(true)}>
       <Icon name="plus" size={18} />
-      Add customer
+      New order
     </button>
   );
 
@@ -59,60 +59,60 @@ export function CustomersPage({ organization }) {
   if (loadError) {
     content = (
       <div className="records__state" role="alert">
-        <p className="records__state-title">We couldn’t load your customers</p>
+        <p className="records__state-title">We couldn’t load your orders</p>
         <p className="records__state-text">{loadError}</p>
         <button type="button" className="button button--secondary button--small" onClick={retry}>
           Try again
         </button>
       </div>
     );
-  } else if (!customers) {
+  } else if (!orders) {
     content = (
       <div className="records__state records__state--loading">
         <span className="spinner" aria-hidden="true" />
-        <span role="status">Loading customers…</span>
+        <span role="status">Loading orders…</span>
       </div>
     );
-  } else if (customers.length === 0) {
+  } else if (orders.length === 0) {
     content = (
       <EmptyState
-        icon="customers"
-        title="No customers yet"
-        description="Add the people and businesses your team works with, and they’ll be listed here."
+        icon="orders"
+        title="No orders yet"
+        description="Record an order for one of your customers, and it will be listed here."
       >
-        {addButton}
+        {newOrderButton}
       </EmptyState>
     );
   } else {
-    content = <CustomerTable customers={customers} labelledBy="customers-list-title" highlightId={added?.id} />;
+    content = <OrderTable orders={orders} labelledBy="orders-list-title" highlightId={created?.id} />;
   }
 
   return (
     <div className="records">
       <div className="records__header">
         <p className="records__intro">
-          The people and businesses <strong>{organization.name}</strong> works with.
+          Orders recorded for the customers of <strong>{organization.name}</strong>.
         </p>
-        {customers && customers.length > 0 && addButton}
+        {orders && orders.length > 0 && newOrderButton}
       </div>
 
       <div role="status" className="records__notice">
-        {added && (
+        {created && (
           <p className="alert alert--success">
-            <strong>{added.name}</strong> was added.
+            Order for <strong>{created.customerName}</strong> was added.
           </p>
         )}
       </div>
 
       <div className="records__panel">
-        <h2 id="customers-list-title" className="records__panel-title">
-          All customers
+        <h2 id="orders-list-title" className="records__panel-title">
+          All orders
         </h2>
         {content}
       </div>
 
-      {adding && (
-        <NewCustomerDialog organizationId={organization.id} onCreated={handleCreated} onClose={() => setAdding(false)} />
+      {creating && (
+        <NewOrderDialog organizationId={organization.id} onCreated={handleCreated} onClose={() => setCreating(false)} />
       )}
     </div>
   );

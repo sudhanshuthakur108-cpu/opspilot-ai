@@ -4,7 +4,7 @@ import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { Icon } from '../../components/Icon.jsx';
 import { TextField } from '../../components/TextField.jsx';
-import './NewCustomerDialog.css';
+import '../../styles/dialog.css';
 
 // Mirrors the server's rules so obvious mistakes are caught before a request is made.
 const NAME_MAX_LENGTH = 120;

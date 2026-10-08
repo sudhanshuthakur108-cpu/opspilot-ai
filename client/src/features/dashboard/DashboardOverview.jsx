@@ -4,21 +4,21 @@ import { Icon } from '../../components/Icon.jsx';
 import { Link } from '../../components/Link.jsx';
 import './DashboardOverview.css';
 
-// Orders and tasks do not exist yet, so their cards show an empty state.
-const RECORD_CARDS = [
+// Cards for the pages that exist. They link there rather than show counts.
+const PAGE_CARDS = [
   {
-    id: 'orders',
-    title: 'Orders',
-    icon: 'orders',
-    emptyTitle: 'No orders yet',
-    emptyText: 'Orders will appear here once your team starts recording them.',
+    href: '/customers',
+    title: 'Customers',
+    icon: 'customers',
+    text: 'Keep a record of the people and businesses your team works with.',
+    linkText: 'View customers',
   },
   {
-    id: 'tasks',
-    title: 'Tasks',
-    icon: 'tasks',
-    emptyTitle: 'No tasks yet',
-    emptyText: 'Tasks will appear here once you create your first one.',
+    href: '/orders',
+    title: 'Orders',
+    icon: 'orders',
+    text: 'Record what your customers have ordered and track each order’s status.',
+    linkText: 'View orders',
   },
 ];
 
@@ -40,8 +40,8 @@ export function DashboardOverview({ organization, justCreated }) {
           {justCreated ? 'Welcome' : 'Welcome back'}, {greetingName}
         </h2>
         <p className="lead">
-          This is the home for <strong className="overview__organization">{organization.name}</strong>. Start by
-          adding your customers; orders and tasks are coming next.
+          This is the home for <strong className="overview__organization">{organization.name}</strong>. Add your
+          customers, then record their orders; tasks are coming next.
         </p>
       </div>
 
@@ -50,30 +50,30 @@ export function DashboardOverview({ organization, justCreated }) {
           Overview
         </h2>
         <ul className="overview__cards">
-          <li className="overview-card">
-            <h3 className="overview-card__title">
-              <span className="overview-card__icon">
-                <Icon name="customers" />
-              </span>
-              Customers
-            </h3>
-            <p className="overview-card__text">Keep a record of the people and businesses your team works with.</p>
-            <Link className="overview-card__link" href="/customers">
-              View customers <span aria-hidden="true">→</span>
-            </Link>
-          </li>
-
-          {RECORD_CARDS.map((card) => (
-            <li key={card.id} className="overview-card">
+          {PAGE_CARDS.map((card) => (
+            <li key={card.href} className="overview-card">
               <h3 className="overview-card__title">
                 <span className="overview-card__icon">
                   <Icon name={card.icon} />
                 </span>
                 {card.title}
               </h3>
-              <EmptyState title={card.emptyTitle} description={card.emptyText} />
+              <p className="overview-card__text">{card.text}</p>
+              <Link className="overview-card__link" href={card.href}>
+                {card.linkText} <span aria-hidden="true">→</span>
+              </Link>
             </li>
           ))}
+
+          <li className="overview-card">
+            <h3 className="overview-card__title">
+              <span className="overview-card__icon">
+                <Icon name="tasks" />
+              </span>
+              Tasks
+            </h3>
+            <EmptyState title="No tasks yet" description="Tasks will appear here once you create your first one." />
+          </li>
 
           <li className="overview-card overview-card--upcoming">
             <div className="overview-card__header">

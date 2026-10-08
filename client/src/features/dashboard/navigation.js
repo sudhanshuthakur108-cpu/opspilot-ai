@@ -10,7 +10,7 @@ export const NAV_SECTIONS = [
     title: 'Operations',
     items: [
       { id: 'customers', label: 'Customers', icon: 'customers', href: '/customers' },
-      { id: 'orders', label: 'Orders', icon: 'orders' },
+      { id: 'orders', label: 'Orders', icon: 'orders', href: '/orders' },
       { id: 'tasks', label: 'Tasks', icon: 'tasks' },
     ],
   },

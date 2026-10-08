@@ -181,7 +181,7 @@ describe('sign-in screen', () => {
     expect(screen.getByLabelText('Email').value).toBe('ada@example.com');
     expect(screen.getByLabelText('Password').value).toBe('');
     expect(screen.getByLabelText('Password').matches(':disabled')).toBe(false);
-    expect(document.activeElement).toBe(screen.getByLabelText('Password'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Password')));
     expect(screen.getByRole('button', { name: 'Sign in' }).matches(':disabled')).toBe(false);
   });
 

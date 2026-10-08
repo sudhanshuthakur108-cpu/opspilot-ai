@@ -20,6 +20,17 @@ export function createMemoryCustomerStore() {
       return toCustomer(record);
     },
 
+    async findById(organizationId, customerId) {
+      const record = records.find((candidate) => candidate.id === customerId && candidate.organizationId === organizationId);
+      return record ? toCustomer(record) : null;
+    },
+
+    async findByIds(organizationId, ids) {
+      return records
+        .filter((record) => record.organizationId === organizationId && ids.includes(record.id))
+        .map(toCustomer);
+    },
+
     async listForOrganization(organizationId, { limit }) {
       return records
         .filter((record) => record.organizationId === organizationId)

@@ -38,6 +38,43 @@ export function TextField({ id, label, hint, error, trailing, ref, ...inputProps
   );
 }
 
+// The same labelled control as TextField, for a <select>; `children` are its options.
+export function SelectField({ id, label, hint, error, ref, children, ...selectProps }) {
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(' ');
+
+  return (
+    <div className="field">
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <div className={error ? 'field__control field__control--invalid' : 'field__control'}>
+        <select
+          id={id}
+          ref={ref}
+          className="field__input field__select"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy || undefined}
+          {...selectProps}
+        >
+          {children}
+        </select>
+      </div>
+      {hint && (
+        <p id={hintId} className="field__hint">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={errorId} className="field__error">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PasswordField({ id, ...props }) {
   const [visible, setVisible] = useState(false);
 

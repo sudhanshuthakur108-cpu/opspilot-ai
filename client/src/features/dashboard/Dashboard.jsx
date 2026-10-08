@@ -3,6 +3,7 @@ import { AppHeader } from '../../components/AppHeader.jsx';
 import { Icon } from '../../components/Icon.jsx';
 import { navigate, usePathname } from '../../routing.js';
 import { CustomersPage } from '../customers/CustomersPage.jsx';
+import { OrdersPage } from '../orders/OrdersPage.jsx';
 import { DashboardOverview } from './DashboardOverview.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import './Dashboard.css';
@@ -15,6 +16,7 @@ const WIDE_SCREEN = '(min-width: 768px)';
 const PAGES = {
   '/': { id: 'dashboard', title: 'Dashboard' },
   '/customers': { id: 'customers', title: 'Customers' },
+  '/orders': { id: 'orders', title: 'Orders' },
 };
 
 // The signed-in app frame for one organization: sidebar, header and the current page.
@@ -88,9 +90,9 @@ export function Dashboard({ organization, justCreated }) {
         </AppHeader>
 
         <main id="main-content" className="dashboard__main" tabIndex={-1}>
-          {page?.id === 'customers' ? (
-            <CustomersPage organization={organization} />
-          ) : (
+          {page?.id === 'customers' && <CustomersPage organization={organization} />}
+          {page?.id === 'orders' && <OrdersPage organization={organization} />}
+          {(!page || page.id === 'dashboard') && (
             <DashboardOverview organization={organization} justCreated={justCreated} />
           )}
         </main>

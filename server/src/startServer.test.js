@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { startServer } from './startServer.js';
 import { captureLogger } from './testing/captureLogger.js';
 import { createMemoryCustomerStore } from './testing/memoryCustomerStore.js';
+import { createMemoryOrderStore } from './testing/memoryOrderStore.js';
 import { createMemoryOrganizationStores } from './testing/memoryOrganizationStores.js';
 import { createMemoryUserStore } from './testing/memoryUserStore.js';
 import { signUp } from './testing/signUp.js';
@@ -48,6 +49,7 @@ function start(uri, { database = fakeDatabase(), logger = captureLogger() } = {}
     organizations,
     memberships,
     customers: createMemoryCustomerStore(),
+    orders: createMemoryOrderStore(),
   });
 }
 
@@ -121,6 +123,22 @@ describe('startServer with a database', () => {
     await shutdown('SIGTERM');
   });
 
+  it('enables order routes for organization members', async () => {
+    const { server, shutdown } = await start(DATABASE_URI);
+    const { cookie } = await signUp(server, { origin: CLIENT_ORIGIN });
+    const created = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Acme', slug: 'acme' });
+
+    const response = await request(server).get(`/api/v1/organizations/${created.body.organization.id}/orders`).set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ orders: [] });
+    await shutdown('SIGTERM');
+  });
+
   it('does not start listening when the database connection fails', async () => {
     const database = fakeDatabase();
     database.connect.mockRejectedValue(new Error('connection refused'));
@@ -183,6 +201,10 @@ describe('startServer without a database', () => {
     const customers = await request(server).get(`/api/v1/organizations/${'a'.repeat(24)}/customers`);
     expect(customers.status).toBe(503);
     expect(customers.body.error.code).toBe('AUTH_UNAVAILABLE');
+
+    const orders = await request(server).get(`/api/v1/organizations/${'a'.repeat(24)}/orders`);
+    expect(orders.status).toBe(503);
+    expect(orders.body.error.code).toBe('AUTH_UNAVAILABLE');
 
     await shutdown('SIGTERM');
     expect(database.disconnect).not.toHaveBeenCalled();

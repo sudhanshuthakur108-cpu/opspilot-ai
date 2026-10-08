@@ -11,6 +11,7 @@ import { createRequireAuth } from './modules/auth/auth.middleware.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createSessions } from './modules/auth/session.js';
 import { createCustomerRouter } from './modules/customers/customer.routes.js';
+import { createOrderRouter } from './modules/orders/order.routes.js';
 import { createHealthRouter } from './modules/health/health.routes.js';
 import { createRequireMembership } from './modules/organizations/organization.middleware.js';
 import { createOrganizationRouter } from './modules/organizations/organization.routes.js';
@@ -23,8 +24,9 @@ function authUnavailable(req, res, next) {
 }
 
 // `auth` ({ users, secret, secureCookie }), `organizationStores` ({ organizations, memberships,
-// withTransaction }) and `customers` (the customer store) are omitted when the app runs without
-// a database. Customer routes need the organization stores for their membership check.
+// withTransaction }), `customers` and `orders` (the customer and order stores) are omitted when
+// the app runs without a database. Customer and order routes need the organization stores for
+// their membership check, and order routes also need the customer store.
 export function createApp({
   logger = defaultLogger,
   databaseState,
@@ -32,6 +34,7 @@ export function createApp({
   auth,
   organizationStores,
   customers,
+  orders,
 } = {}) {
   const app = express();
 
@@ -52,9 +55,12 @@ export function createApp({
     if (organizationStores) {
       app.use('/api/v1/organizations', createOrganizationRouter({ requireAuth, ...organizationStores }));
 
+      const requireMembership = createRequireMembership({ requireAuth, memberships: organizationStores.memberships });
       if (customers) {
-        const requireMembership = createRequireMembership({ requireAuth, memberships: organizationStores.memberships });
         app.use('/api/v1/organizations/:organizationId/customers', createCustomerRouter({ requireMembership, customers }));
+      }
+      if (customers && orders) {
+        app.use('/api/v1/organizations/:organizationId/orders', createOrderRouter({ requireMembership, orders, customers }));
       }
     }
   } else {

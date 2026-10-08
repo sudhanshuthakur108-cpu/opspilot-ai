@@ -12,6 +12,8 @@
 .field__control {
   display: flex;
   align-items: center;
+  /* Lets a field narrower than the input's natural width shrink instead of overflowing. */
+  min-width: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
@@ -57,6 +59,19 @@
   color: var(--color-text);
   background: transparent;
   outline: none;
+}
+
+.field__select {
+  padding-right: 2.5rem;
+  appearance: none;
+  /* A chevron drawn in the muted text color (#545e71). */
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m6 8 4 4 4-4' fill='none' stroke='%23545e71' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 0.75rem center / 1.125rem;
+  cursor: pointer;
+}
+
+.field__select:disabled {
+  cursor: not-allowed;
 }
 
 .field__input::placeholder {
