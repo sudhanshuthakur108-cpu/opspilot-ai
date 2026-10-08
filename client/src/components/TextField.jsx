@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import './TextField.css';
 
-// A labelled input with an optional error message, wired up for screen readers.
+// A labelled input with an optional hint and error message, wired up for screen readers.
 // `trailing` renders inside the input frame (used by PasswordField for its toggle).
-export function TextField({ id, label, error, trailing, ref, ...inputProps }) {
+export function TextField({ id, label, hint, error, trailing, ref, ...inputProps }) {
+  const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
+  const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(' ');
 
   return (
     <div className="field">
@@ -17,11 +19,16 @@ export function TextField({ id, label, error, trailing, ref, ...inputProps }) {
           ref={ref}
           className="field__input"
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-describedby={describedBy || undefined}
           {...inputProps}
         />
         {trailing}
       </div>
+      {hint && (
+        <p id={hintId} className="field__hint">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={errorId} className="field__error">
           {error}

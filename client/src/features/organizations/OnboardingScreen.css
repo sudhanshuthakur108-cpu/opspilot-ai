@@ -1,0 +1,43 @@
+.onboarding {
+  max-width: 480px;
+}
+
+.onboarding__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-5);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.onboarding .page-title {
+  margin-top: var(--space-2);
+}
+
+.onboarding__lead {
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.onboarding__alert {
+  margin-bottom: var(--space-5);
+}
+
+.onboarding__fields {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.onboarding__footnote {
+  margin-top: var(--space-5);
+  font-size: var(--text-xs);
+  text-align: center;
+  color: var(--color-text-subtle);
+}

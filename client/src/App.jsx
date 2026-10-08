@@ -1,24 +1,14 @@
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import { useAuth } from './auth/authContext.js';
-import { BrandMark } from './components/Brand.jsx';
+import { LoadingScreen } from './components/LoadingScreen.jsx';
 import { AuthScreen } from './features/auth/AuthScreen.jsx';
-import { SignedInScreen } from './features/auth/SignedInScreen.jsx';
-
-function StartupScreen() {
-  return (
-    <div className="startup" role="status">
-      <BrandMark />
-      <span className="spinner" aria-hidden="true" />
-      <span className="visually-hidden">Loading OpsPilot…</span>
-    </div>
-  );
-}
+import { Workspace } from './features/organizations/Workspace.jsx';
 
 function Screens() {
   const { status } = useAuth();
 
-  if (status === 'loading') return <StartupScreen />;
-  if (status === 'authenticated') return <SignedInScreen />;
+  if (status === 'loading') return <LoadingScreen label="Loading OpsPilot…" />;
+  if (status === 'authenticated') return <Workspace />;
   return <AuthScreen />;
 }
 

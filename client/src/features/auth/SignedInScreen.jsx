@@ -1,72 +1,53 @@
-import { useState } from 'react';
-import { useAuth } from '../../auth/authContext.js';
-import { Brand } from '../../components/Brand.jsx';
+import { AppHeader } from '../../components/AppHeader.jsx';
 import './SignedInScreen.css';
 
-// Temporary landing screen for signed-in users until the dashboard exists.
-export function SignedInScreen() {
-  const { user, signOut } = useAuth();
-  const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState('');
+const ROLE_LABELS = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
-  async function handleSignOut() {
-    setSigningOut(true);
-    setError('');
-    try {
-      await signOut();
-    } catch {
-      setError('We couldn’t sign you out. Please try again.');
-      setSigningOut(false);
-    }
-  }
+// Temporary home for signed-in users with at least one organization, until the dashboard exists.
+export function SignedInScreen({ organizations, createdOrganizationId }) {
+  const created = organizations.find((organization) => organization.id === createdOrganizationId);
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header__inner">
-          <Brand />
-          <div className="app-header__account">
-            <span className="app-header__email">{user.email}</span>
-            <button
-              type="button"
-              className="button button--secondary button--small"
-              onClick={handleSignOut}
-              disabled={signingOut}
-            >
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
-      <main className="signed-in">
-        <section className="signed-in__card" aria-labelledby="signed-in-title">
-          <div className="signed-in__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="24" height="24" focusable="false">
-              <path
-                d="m5 12.5 4.5 4.5L19 7.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          <h1 id="signed-in-title" className="signed-in__title">
-            You’re signed in
-          </h1>
-          <p className="signed-in__account">
-            Signed in as <strong>{user.email}</strong>
-          </p>
-          <p className="signed-in__note">Your dashboard will appear here in an upcoming release.</p>
-
-          {error && (
-            <p className="alert alert--error signed-in__alert" role="alert">
-              {error}
+      <main className="app-main">
+        <div className="home">
+          {created && (
+            <p className="alert alert--success home__notice" role="status">
+              <strong>{created.name}</strong> is ready. You’re its owner.
             </p>
           )}
-        </section>
+
+          <div className="home__header">
+            <p className="eyebrow">{created ? 'Workspace created' : 'Welcome back'}</p>
+            <h1 className="page-title">Your workspaces</h1>
+          </div>
+
+          <ul className="panel org-list" aria-label="Your organizations">
+            {organizations.map((organization) => (
+              <li key={organization.id} className="org-list__item">
+                <span className="org-list__avatar" aria-hidden="true">
+                  {organization.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="org-list__details">
+                  <span className="org-list__name">{organization.name}</span>
+                  <span className="org-list__slug">{organization.slug}</span>
+                </span>
+                <span className={`role-badge role-badge--${organization.role}`}>
+                  {ROLE_LABELS[organization.role] ?? organization.role}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <section className="home__next" aria-labelledby="next-title">
+            <h2 id="next-title" className="home__next-title">
+              Operations dashboard
+            </h2>
+            <p>Coming next. Your workspace’s day-to-day operations will live here.</p>
+          </section>
+        </div>
       </main>
     </div>
   );

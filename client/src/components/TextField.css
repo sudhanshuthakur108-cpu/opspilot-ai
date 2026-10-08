@@ -101,6 +101,11 @@
   cursor: not-allowed;
 }
 
+.field__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
 .field__error {
   font-size: var(--text-xs);
   color: var(--color-danger-text);

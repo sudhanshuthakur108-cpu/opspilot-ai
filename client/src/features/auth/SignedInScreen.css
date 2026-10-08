@@ -1,110 +1,112 @@
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+.home {
+  width: 100%;
+  max-width: 720px;
 }
 
-.app-header {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+.home__notice {
+  margin-bottom: var(--space-5);
 }
 
-.app-header__inner {
+.home__notice strong {
+  font-weight: 600;
+}
+
+.home__header {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.org-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.org-list__item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
-  max-width: 1120px;
-  height: 64px;
-  margin: 0 auto;
-  padding: 0 var(--space-5);
+  padding: var(--space-4) var(--space-5);
 }
 
-.app-header__account {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
+.org-list__item + .org-list__item {
+  border-top: 1px solid var(--color-border);
+}
+
+.org-list__avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.org-list__details {
+  display: grid;
+  flex: 1;
   min-width: 0;
 }
 
-.app-header__email {
+.org-list__name {
   overflow: hidden;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.signed-in {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  padding: var(--space-8) var(--space-4);
+.org-list__slug {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.signed-in__card {
-  width: 100%;
-  max-width: 460px;
-  padding: var(--space-7);
-  text-align: center;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-}
-
-.signed-in__icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  margin: 0 auto var(--space-5);
-  color: var(--color-success);
-  background: var(--color-success-soft);
-  border-radius: 50%;
-}
-
-.signed-in__title {
-  margin-bottom: var(--space-2);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-
-.signed-in__account {
+.role-badge {
+  flex-shrink: 0;
+  padding: 0.125rem 0.625rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--color-text-muted);
-  overflow-wrap: anywhere;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
 }
 
-.signed-in__account strong {
+.role-badge--owner {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: transparent;
+}
+
+.home__next {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.home__next-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--color-text);
 }
 
-.signed-in__note {
-  margin-top: var(--space-5);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-md);
-}
-
-.signed-in__alert {
-  margin-top: var(--space-4);
-  text-align: left;
+/* The list is itself the panel, so its rows carry the padding. */
+.panel.org-list {
+  padding: 0;
 }
 
 @media (max-width: 480px) {
-  .app-header__inner {
-    padding: 0 var(--space-4);
-  }
-
-  .app-header__email {
-    display: none;
-  }
-
-  .signed-in__card {
-    padding: var(--space-6) var(--space-5);
+  .org-list__item {
+    padding: var(--space-4);
   }
 }

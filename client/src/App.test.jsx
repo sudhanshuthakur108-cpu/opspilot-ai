@@ -4,6 +4,7 @@ import App from './App.jsx';
 
 const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
 const PASSWORD = 'correct horse battery';
+const ACME = { id: 'b'.repeat(24), name: 'Acme Logistics', slug: 'acme-logistics', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 
 function json(status, body) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -13,7 +14,9 @@ const unauthenticated = () =>
   json(401, { error: { code: 'UNAUTHENTICATED', message: 'Authentication required', requestId: 'r1' } });
 
 // Stubs fetch with handlers keyed by "METHOD path". Unexpected requests fail the test.
-function mockApi(handlers) {
+// Signed-in users belong to one organization unless a test says otherwise.
+function mockApi(overrides) {
+  const handlers = { 'GET /api/v1/organizations': () => json(200, { organizations: [ACME] }), ...overrides };
   const fetchMock = vi.fn(async (url, init = {}) => {
     const key = `${init.method ?? 'GET'} ${url}`;
     const handler = handlers[key];
@@ -72,7 +75,7 @@ describe('startup', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'You’re signed in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
     expect(screen.getAllByText(USER.email).length).toBeGreaterThan(0);
   });
 
@@ -155,7 +158,7 @@ describe('sign-in screen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('heading', { name: 'You’re signed in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
     const [[, init]] = requestsTo(fetchMock, 'POST', '/api/v1/auth/login');
     expect(init.credentials).toBe('same-origin');
     expect(init.headers['Content-Type']).toBe('application/json');
@@ -221,7 +224,7 @@ describe('sign-in screen', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/v1/auth/login')).toHaveLength(1);
 
     finishLogin(json(200, { user: USER }));
-    expect(await screen.findByRole('heading', { name: 'You’re signed in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
   });
 });
 
@@ -236,7 +239,7 @@ describe('creating an account', () => {
     fillIn('Password', PASSWORD);
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(await screen.findByRole('heading', { name: 'You’re signed in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
     const [[, init]] = requestsTo(fetchMock, 'POST', '/api/v1/auth/register');
     expect(JSON.parse(init.body)).toEqual({ email: 'ada@example.com', password: PASSWORD });
   });
@@ -267,7 +270,7 @@ describe('signed in', () => {
   async function renderSignedIn(handlers = {}) {
     const fetchMock = mockApi({ 'GET /api/v1/auth/me': () => json(200, { user: USER }), ...handlers });
     render(<App />);
-    await screen.findByRole('heading', { name: 'You’re signed in' });
+    await screen.findByRole('heading', { name: 'Your workspaces' });
     return fetchMock;
   }
 
@@ -292,7 +295,7 @@ describe('signed in', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect((await screen.findByRole('alert')).textContent).toBe('We couldn’t sign you out. Please try again.');
-    expect(screen.getByRole('heading', { name: 'You’re signed in' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' }).disabled).toBe(false);
   });
 });
@@ -306,7 +309,7 @@ describe('security', () => {
     fillIn('Email', 'ada@example.com');
     fillIn('Password', PASSWORD);
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await screen.findByRole('heading', { name: 'You’re signed in' });
+    await screen.findByRole('heading', { name: 'Your workspaces' });
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await screen.findByRole('heading', { name: 'Welcome back' });
 
@@ -319,9 +322,9 @@ describe('security', () => {
     mockApi({ 'GET /api/v1/auth/me': () => json(200, { user: USER }) });
     render(<App />);
 
-    const card = (await screen.findByRole('heading', { name: 'You’re signed in' })).closest('section');
+    await screen.findByRole('heading', { name: 'Your workspaces' });
 
-    expect(within(card).getByText(USER.email)).toBeTruthy();
+    expect(within(screen.getByRole('banner')).getByText(USER.email)).toBeTruthy();
     await waitFor(() => expect(document.cookie).toBe(''));
   });
 });

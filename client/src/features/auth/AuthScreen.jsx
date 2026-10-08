@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { Brand } from '../../components/Brand.jsx';
 import { PasswordField, TextField } from '../../components/TextField.jsx';
@@ -51,9 +52,6 @@ function validate({ email, password }, mode) {
 // Server errors are turned into fixed messages; a sign-in failure never says which of the
 // email or password was wrong.
 function describeError(error, mode) {
-  if (error.code === 'NETWORK_ERROR') {
-    return 'We couldn’t reach OpsPilot. Check your connection and try again.';
-  }
   if (error.status === 429) {
     return 'Too many attempts. Wait a few minutes, then try again.';
   }
@@ -66,11 +64,11 @@ function describeError(error, mode) {
   if (error.status === 400) {
     return 'Check your details and try again.';
   }
-  return 'Something went wrong on our side. Please try again.';
+  return describeRequestError(error);
 }
 
 export function AuthScreen() {
-  const { signIn, signUp, sessionCheckFailed } = useAuth();
+  const { signIn, signUp, sessionCheckFailed, sessionExpired } = useAuth();
   const [mode, setMode] = useState('signIn');
   const [values, setValues] = useState({ email: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState({});
@@ -139,6 +137,9 @@ export function AuthScreen() {
 
           {sessionCheckFailed && !formError && (
             <p className="alert auth-card__alert">We couldn’t check whether you’re already signed in.</p>
+          )}
+          {sessionExpired && !formError && (
+            <p className="alert auth-card__alert">Your session has ended. Sign in again to continue.</p>
           )}
           {formError && (
             <p className="alert alert--error auth-card__alert" role="alert">

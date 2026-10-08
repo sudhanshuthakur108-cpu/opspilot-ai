@@ -1,0 +1,50 @@
+.app-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 1120px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.app-header__account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.app-header__email {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-header__alert {
+  max-width: 1120px;
+  margin: 0 auto var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 480px) {
+  .app-header__inner {
+    padding: 0 var(--space-4);
+  }
+
+  .app-header__email {
+    display: none;
+  }
+
+  .app-header__alert {
+    margin: 0 var(--space-4) var(--space-3);
+  }
+}
