@@ -10,7 +10,9 @@ import { requireSameOrigin } from './middleware/sameOrigin.js';
 import { createRequireAuth } from './modules/auth/auth.middleware.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createSessions } from './modules/auth/session.js';
+import { createCustomerRouter } from './modules/customers/customer.routes.js';
 import { createHealthRouter } from './modules/health/health.routes.js';
+import { createRequireMembership } from './modules/organizations/organization.middleware.js';
 import { createOrganizationRouter } from './modules/organizations/organization.routes.js';
 
 // The largest current body is a login or registration request, so 10 kB is ample.
@@ -20,14 +22,16 @@ function authUnavailable(req, res, next) {
   next(new HttpError(503, 'AUTH_UNAVAILABLE', 'Authentication is unavailable because no database is configured'));
 }
 
-// `auth` ({ users, secret, secureCookie }) and `organizationStores` ({ organizations, memberships,
-// withTransaction }) are omitted when the app runs without a database.
+// `auth` ({ users, secret, secureCookie }), `organizationStores` ({ organizations, memberships,
+// withTransaction }) and `customers` (the customer store) are omitted when the app runs without
+// a database. Customer routes need the organization stores for their membership check.
 export function createApp({
   logger = defaultLogger,
   databaseState,
   clientOrigin = DEFAULT_CLIENT_ORIGIN,
   auth,
   organizationStores,
+  customers,
 } = {}) {
   const app = express();
 
@@ -47,6 +51,11 @@ export function createApp({
     app.use('/api/v1/auth', createAuthRouter({ users: auth.users, sessions, requireAuth }));
     if (organizationStores) {
       app.use('/api/v1/organizations', createOrganizationRouter({ requireAuth, ...organizationStores }));
+
+      if (customers) {
+        const requireMembership = createRequireMembership({ requireAuth, memberships: organizationStores.memberships });
+        app.use('/api/v1/organizations/:organizationId/customers', createCustomerRouter({ requireMembership, customers }));
+      }
     }
   } else {
     app.use(['/api/v1/auth', '/api/v1/organizations'], authUnavailable);

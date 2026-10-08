@@ -2,6 +2,7 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { startServer } from './startServer.js';
 import { captureLogger } from './testing/captureLogger.js';
+import { createMemoryCustomerStore } from './testing/memoryCustomerStore.js';
 import { createMemoryOrganizationStores } from './testing/memoryOrganizationStores.js';
 import { createMemoryUserStore } from './testing/memoryUserStore.js';
 import { signUp } from './testing/signUp.js';
@@ -46,6 +47,7 @@ function start(uri, { database = fakeDatabase(), logger = captureLogger() } = {}
     users: createMemoryUserStore(),
     organizations,
     memberships,
+    customers: createMemoryCustomerStore(),
   });
 }
 
@@ -95,6 +97,25 @@ describe('startServer with a database', () => {
       .set('Origin', CLIENT_ORIGIN)
       .set('Cookie', cookie)
       .send({ name: 'Acme', slug: 'acme' });
+
+    expect(response.status).toBe(201);
+    await shutdown('SIGTERM');
+  });
+
+  it('enables customer routes for organization members', async () => {
+    const { server, shutdown } = await start(DATABASE_URI);
+    const { cookie } = await signUp(server, { origin: CLIENT_ORIGIN });
+    const created = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Acme', slug: 'acme' });
+
+    const response = await request(server)
+      .post(`/api/v1/organizations/${created.body.organization.id}/customers`)
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Initech' });
 
     expect(response.status).toBe(201);
     await shutdown('SIGTERM');
@@ -158,6 +179,10 @@ describe('startServer without a database', () => {
       .send({ name: 'Acme', slug: 'acme' });
     expect(organizations.status).toBe(503);
     expect(organizations.body.error.code).toBe('AUTH_UNAVAILABLE');
+
+    const customers = await request(server).get(`/api/v1/organizations/${'a'.repeat(24)}/customers`);
+    expect(customers.status).toBe(503);
+    expect(customers.body.error.code).toBe('AUTH_UNAVAILABLE');
 
     await shutdown('SIGTERM');
     expect(database.disconnect).not.toHaveBeenCalled();

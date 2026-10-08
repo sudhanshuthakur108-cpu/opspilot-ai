@@ -6,7 +6,7 @@ import { json, mockApi } from '../../testing/mockApi.js';
 const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
 const ACME = { id: 'b'.repeat(24), name: 'Acme Logistics', slug: 'acme-logistics', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 const GLOBEX = { id: 'c'.repeat(24), name: 'Globex', slug: 'globex', role: 'member', createdAt: '2026-10-01T09:00:00.000Z' };
-const UPCOMING_SECTIONS = ['Customers', 'Orders', 'Tasks', 'AI Assistant', 'Approvals', 'Audit Logs', 'Settings'];
+const UPCOMING_SECTIONS = ['Orders', 'Tasks', 'AI Assistant', 'Approvals', 'Audit Logs', 'Settings'];
 
 async function renderDashboard({ organizations = [ACME], ...handlers } = {}) {
   const fetchMock = mockApi({
@@ -29,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  window.history.replaceState(null, '', '/');
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -65,7 +66,7 @@ describe('dashboard', () => {
   it('lists the upcoming sections as not yet available, without linking anywhere', async () => {
     await renderDashboard();
 
-    expect(within(navigation()).getAllByRole('link')).toHaveLength(1);
+    expect(within(navigation()).getAllByRole('link').map((link) => link.textContent)).toEqual(['Dashboard', 'Customers']);
     expect(within(navigation()).queryAllByRole('button')).toHaveLength(0);
     for (const label of UPCOMING_SECTIONS) {
       const item = within(navigation()).getByText(label).closest('li');
@@ -74,12 +75,19 @@ describe('dashboard', () => {
     }
   });
 
-  it('shows an empty state for each kind of record instead of data', async () => {
+  it('points to the Customers page instead of claiming there are no customers', async () => {
+    await renderDashboard();
+    const card = within(screen.getByRole('main')).getByRole('heading', { level: 3, name: 'Customers' }).closest('li');
+
+    expect(within(card).queryByText(/no customers/i)).toBeNull();
+    expect(within(card).getByRole('link', { name: 'View customers' }).getAttribute('href')).toBe('/customers');
+  });
+
+  it('shows an empty state for orders, tasks and activity instead of data', async () => {
     await renderDashboard();
     const main = within(screen.getByRole('main'));
 
     for (const [title, empty, explanation] of [
-      ['Customers', 'No customers yet', 'Customers will appear here once you add them.'],
       ['Orders', 'No orders yet', 'Orders will appear here once your team starts recording them.'],
       ['Tasks', 'No tasks yet', 'Tasks will appear here once you create your first one.'],
     ]) {

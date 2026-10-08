@@ -1,18 +1,11 @@
 import { useAuth } from '../../auth/authContext.js';
-import { EmptyState } from './EmptyState.jsx';
-import { Icon } from './Icon.jsx';
+import { EmptyState } from '../../components/EmptyState.jsx';
+import { Icon } from '../../components/Icon.jsx';
+import { Link } from '../../components/Link.jsx';
 import './DashboardOverview.css';
 
-// No customer, order or task records exist yet, so each card shows its empty state. Real
-// counts replace them once those APIs are built.
+// Orders and tasks do not exist yet, so their cards show an empty state.
 const RECORD_CARDS = [
-  {
-    id: 'customers',
-    title: 'Customers',
-    icon: 'customers',
-    emptyTitle: 'No customers yet',
-    emptyText: 'Customers will appear here once you add them.',
-  },
   {
     id: 'orders',
     title: 'Orders',
@@ -35,7 +28,7 @@ export function DashboardOverview({ organization, justCreated }) {
   const greetingName = user.email.split('@')[0];
 
   return (
-    <main id="dashboard-main" className="overview" tabIndex={-1}>
+    <div className="overview">
       {justCreated && (
         <p className="alert alert--success overview__notice" role="status">
           <strong>{organization.name}</strong> is ready. You’re its owner.
@@ -47,8 +40,8 @@ export function DashboardOverview({ organization, justCreated }) {
           {justCreated ? 'Welcome' : 'Welcome back'}, {greetingName}
         </h2>
         <p className="lead">
-          This is the home for <strong className="overview__organization">{organization.name}</strong>. Customers,
-          orders and tasks will show up here as your team adds them.
+          This is the home for <strong className="overview__organization">{organization.name}</strong>. Start by
+          adding your customers; orders and tasks are coming next.
         </p>
       </div>
 
@@ -57,6 +50,19 @@ export function DashboardOverview({ organization, justCreated }) {
           Overview
         </h2>
         <ul className="overview__cards">
+          <li className="overview-card">
+            <h3 className="overview-card__title">
+              <span className="overview-card__icon">
+                <Icon name="customers" />
+              </span>
+              Customers
+            </h3>
+            <p className="overview-card__text">Keep a record of the people and businesses your team works with.</p>
+            <Link className="overview-card__link" href="/customers">
+              View customers <span aria-hidden="true">→</span>
+            </Link>
+          </li>
+
           {RECORD_CARDS.map((card) => (
             <li key={card.id} className="overview-card">
               <h3 className="overview-card__title">
@@ -96,6 +102,6 @@ export function DashboardOverview({ organization, justCreated }) {
           description="Changes your team makes in this workspace will appear here."
         />
       </section>
-    </main>
+    </div>
   );
 }

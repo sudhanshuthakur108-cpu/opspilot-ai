@@ -10,6 +10,15 @@
   min-width: 0;
 }
 
+.dashboard__main {
+  flex: 1;
+}
+
+/* Focused only by the skip link; the page itself needs no ring. */
+.dashboard__main:focus {
+  outline: none;
+}
+
 .dashboard-header {
   position: sticky;
   top: 0;

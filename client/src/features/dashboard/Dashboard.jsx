@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppHeader } from '../../components/AppHeader.jsx';
+import { Icon } from '../../components/Icon.jsx';
+import { navigate, usePathname } from '../../routing.js';
+import { CustomersPage } from '../customers/CustomersPage.jsx';
 import { DashboardOverview } from './DashboardOverview.jsx';
-import { Icon } from './Icon.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import './Dashboard.css';
 
@@ -9,10 +11,23 @@ const SIDEBAR_ID = 'dashboard-sidebar';
 // Where the sidebar stops being a drawer; matches the breakpoint in Sidebar.css.
 const WIDE_SCREEN = '(min-width: 768px)';
 
-// The signed-in app frame for one organization: sidebar, header and the dashboard itself.
+// Pages by path; `id` matches the sidebar entries in navigation.js.
+const PAGES = {
+  '/': { id: 'dashboard', title: 'Dashboard' },
+  '/customers': { id: 'customers', title: 'Customers' },
+};
+
+// The signed-in app frame for one organization: sidebar, header and the current page.
 export function Dashboard({ organization, justCreated }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
+  const pathname = usePathname();
+  const page = PAGES[pathname];
+
+  // An unknown address falls back to the dashboard.
+  useEffect(() => {
+    if (!page) navigate('/', { replace: true });
+  }, [page]);
 
   // While the drawer is open, Escape closes it, and so does widening the window until the
   // sidebar is always shown. Once it closes, focus goes back to the menu button.
@@ -37,14 +52,14 @@ export function Dashboard({ organization, justCreated }) {
 
   return (
     <div className={menuOpen ? 'dashboard dashboard--menu-open' : 'dashboard'}>
-      <a className="skip-link" href="#dashboard-main">
+      <a className="skip-link" href="#main-content">
         Skip to content
       </a>
 
       <Sidebar
         id={SIDEBAR_ID}
         organization={organization}
-        currentPage="dashboard"
+        currentPage={page?.id}
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
       />
@@ -67,12 +82,18 @@ export function Dashboard({ organization, justCreated }) {
             </button>
             <div className="dashboard-header__heading">
               <p className="dashboard-header__context">{organization.name}</p>
-              <h1 className="dashboard-header__title">Dashboard</h1>
+              <h1 className="dashboard-header__title">{page?.title ?? 'Dashboard'}</h1>
             </div>
           </div>
         </AppHeader>
 
-        <DashboardOverview organization={organization} justCreated={justCreated} />
+        <main id="main-content" className="dashboard__main" tabIndex={-1}>
+          {page?.id === 'customers' ? (
+            <CustomersPage organization={organization} />
+          ) : (
+            <DashboardOverview organization={organization} justCreated={justCreated} />
+          )}
+        </main>
       </div>
     </div>
   );

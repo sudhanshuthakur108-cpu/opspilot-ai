@@ -13,6 +13,7 @@ const PATHS = {
   activity: 'M3.5 12h3.75l2.5-6.5 4.5 13 2.5-6.5h3.75',
   menu: 'M4 7h16M4 12h16M4 17h16',
   close: 'M6.5 6.5l11 11M17.5 6.5l-11 11',
+  plus: 'M12 5.5v13M5.5 12h13',
 };
 
 export function Icon({ name, size = 20 }) {

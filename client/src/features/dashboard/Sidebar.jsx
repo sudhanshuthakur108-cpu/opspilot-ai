@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../../auth/authContext.js';
 import { Brand } from '../../components/Brand.jsx';
-import { Icon } from './Icon.jsx';
+import { Icon } from '../../components/Icon.jsx';
+import { Link } from '../../components/Link.jsx';
 import { NAV_SECTIONS } from './navigation.js';
 import './Sidebar.css';
 
@@ -24,22 +25,16 @@ function NavItem({ item, current, onNavigate }) {
     );
   }
 
-  // Following a link to the page that is already open would only reload it.
-  function handleClick(event) {
-    if (current) event.preventDefault();
-    onNavigate();
-  }
-
   return (
-    <a
+    <Link
       className="sidebar__link"
       href={item.href}
       title={item.label}
       aria-current={current ? 'page' : undefined}
-      onClick={handleClick}
+      onClick={onNavigate}
     >
       {content}
-    </a>
+    </Link>
   );
 }
 

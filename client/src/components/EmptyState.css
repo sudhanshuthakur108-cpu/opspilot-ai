@@ -28,6 +28,10 @@
   font-weight: 600;
 }
 
+.empty-state__action {
+  margin-top: var(--space-4);
+}
+
 .empty-state__description {
   max-width: 38ch;
   text-wrap: balance;

@@ -101,7 +101,7 @@ opspilot-ai/
 
 ## 4. Planned API Route Groups
 
-All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations` and `GET /organizations` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
+All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, and `GET` and `POST /organizations/:organizationId/customers` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
 
 **Common conventions (planned):**
 
@@ -130,7 +130,16 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 - Order: newest first by the organization's `createdAt`, with ties broken by ID (newer IDs first).
 - The lookup goes through memberships: the user's memberships (by the `userId` index), then only those organizations (by `_id`). No organization outside the user's memberships is ever loaded.
 - No pagination yet. A user is expected to belong to few organizations.
-| **Customers** | `GET`, `POST /organizations/:organizationId/customers`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/customers/:id` | Org member |
+
+**`POST` and `GET /organizations/:organizationId/customers` (implemented):**
+
+- Both run the membership middleware first: no valid session gets 401, a malformed organization ID 400, and a non-member 404 (the same as a missing organization). Any role may list and create customers.
+- The organization is always `req.membership.organizationId`. An `organizationId` in the body, query or headers is ignored, as are other server-controlled fields.
+- `POST` body: `{ "name": string, "email"?: string, "phone"?: string }`. The name is trimmed (1–120 characters). The email is optional, trimmed and lowercased, and must look like an address (at most 254 characters). The phone is optional and trimmed (at most 40 characters). A missing, null or blank optional field is stored as absent; a non-string value gets 400 `VALIDATION_FAILED`.
+- `201 { customer: { id, name, email, phone, createdAt, updatedAt } }`, with `null` for an absent email or phone. `GET` returns `200 { customers: [...] }` with `Cache-Control: no-store`: at most the 50 newest, ordered by `createdAt` then ID (newest first). There is no paging yet.
+- Emails are not unique: different organizations may have customers with the same address, and no rule within one organization has been decided.
+- Customers are stored with `organizationId` as an ObjectId and an index on `{ organizationId: 1, createdAt: -1, _id: -1 }`.
+| **Customers** | `GET`, `POST /organizations/:organizationId/customers` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/customers/:id` | Org member (any role) |
 | **Orders** | `GET`, `POST /organizations/:organizationId/orders`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/orders/:id` | Org member |
 | **Tasks** | `GET`, `POST /organizations/:organizationId/tasks`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
 | **AI tools** | `POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited |
@@ -205,12 +214,12 @@ sequenceDiagram
 - **Brute-force protection:** login and register share a limit of 10 attempts per client IP per 15 minutes (in memory, per instance). The IP is only correct once the `trust proxy` setting is configured (see [Section 6](#error-handling-planned)). A per-account login limit is still planned. Login failures return a generic message that does not reveal whether the email exists, and an unknown email still runs a full password verification so response timing is similar.
 - **Registration** returns 409 for an email that is already registered. This reveals that the account exists, which cannot be avoided without email verification; the rate limit slows scanning.
 
-### Organization-level data isolation (membership checks implemented; no organization-owned resources yet)
+### Organization-level data isolation (membership checks implemented; customers are the first organization-owned resource)
 
 - Every organization-owned document stores an `organizationId`, and its indexes start with `organizationId`.
 - A membership collection links users to organizations and stores a role: `owner`, `admin` or `member`, defined once in `modules/organizations/roles.js`. What each role may do is still undecided.
 - **Implemented:** the Organization model (unique `slug`), the Membership model (one membership per user per organization), their stores, and a service that creates an organization together with its owner membership in a single transaction, so an organization never exists without an owner.
-- **Implemented:** membership middleware for routes under `/organizations/:organizationId/...`, in `modules/organizations/organization.middleware.js`. No route uses it yet. It runs on every request, so a removed membership takes effect immediately.
+- **Implemented:** membership middleware for routes under `/organizations/:organizationId/...`, in `modules/organizations/organization.middleware.js`. The customer routes use it. It runs on every request, so a removed membership takes effect immediately.
   - `createRequireMembership({ requireAuth, memberships })` returns `[requireAuth, checkMembership]`, so authentication always runs first.
   - It checks the `:organizationId` route parameter against the authenticated user's ID with `memberships.find`. A user ID, role or organization ID anywhere else in the request is ignored.
   - It attaches only `req.membership = { id, organizationId, userId, role }`.
@@ -320,9 +329,9 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
-| **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; no route uses the middleware yet, and the other organization routes and per-resource isolation tests are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
+| **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; the customer routes use the middleware and have isolation tests, and the other organization routes are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
 | **6. Audit log service** | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
-| **7. Customers** | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
+| **7. Customers** (**In progress**: create and list are implemented with validation and isolation tests, including against a temporary MongoDB replica set, and the client has a list page and an add form with component tests; get, update and delete are not built) | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
 | **8. Orders and tasks** | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
 | **9. AI layer (mock)** | Provider interface, mock provider, summarize and suggest endpoints, rate limits | Endpoint tests pass with deterministic mock output, and a component test shows AI output containing HTML is displayed as plain text |
 | **10. Approvals** | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
@@ -333,7 +342,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 
 These are intentionally left undecided rather than assumed:
 
-- The fields and statuses for customers, orders and tasks.
+- The fields and statuses for orders and tasks, and any customer fields beyond name, email and phone.
 - Hard delete or archive (soft delete) for each module.
 - The final roles and permissions, including whether users can approve their own requests.
 - Which kinds of AI-proposed data change need approval, beyond the planned example.

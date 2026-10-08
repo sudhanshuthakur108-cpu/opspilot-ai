@@ -130,7 +130,8 @@ a.sidebar__link:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
-.sidebar__link[aria-current='page'] {
+/* `a` keeps this ahead of the hover style, so the current page looks the same under the pointer. */
+a.sidebar__link[aria-current='page'] {
   font-weight: 600;
   color: var(--color-primary);
   background: var(--color-primary-soft);

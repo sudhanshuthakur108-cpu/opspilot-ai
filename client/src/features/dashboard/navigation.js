@@ -1,5 +1,5 @@
-// Sidebar entries, grouped into sections. Only the dashboard exists so far; an entry without an
-// `href` is shown as upcoming and gets one once its page is built.
+// Sidebar entries, grouped into sections. An entry without an `href` is shown as upcoming and
+// gets one once its page is built (see PAGES in Dashboard.jsx).
 export const NAV_SECTIONS = [
   {
     id: 'home',
@@ -9,7 +9,7 @@ export const NAV_SECTIONS = [
     id: 'operations',
     title: 'Operations',
     items: [
-      { id: 'customers', label: 'Customers', icon: 'customers' },
+      { id: 'customers', label: 'Customers', icon: 'customers', href: '/customers' },
       { id: 'orders', label: 'Orders', icon: 'orders' },
       { id: 'tasks', label: 'Tasks', icon: 'tasks' },
     ],
