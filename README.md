@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`) and organizations for signed-in users (`POST /api/v1/organizations` creates one with the caller as owner; `GET /api/v1/organizations` lists the caller's organizations and roles), plus a React client with sign-in and account creation, session restore on load and sign-out. After sign-in, a user without an organization is guided through creating one (the address is generated from the name); a user with organizations sees them with their role on a temporary home screen in place of the dashboard. Authentication and organizations require the database. There is no dashboard or organization switching yet, and the rest of the product features below are not implemented.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`) and organizations for signed-in users (`POST /api/v1/organizations` creates one with the caller as owner; `GET /api/v1/organizations` lists the caller's organizations and roles), plus a React client with sign-in and account creation, session restore on load and sign-out. After sign-in, a user without an organization is guided through creating one (the address is generated from the name); a user with an organization lands on the dashboard shell: a sidebar (an icon rail on medium screens, a drawer on small ones) with the workspace and the user's role, a header with the organization and the signed-in email, and empty states for customers, orders, tasks and recent activity. Only the Dashboard section exists; the other sections in the sidebar, and the AI Assistant, are shown as coming soon. A user in several organizations sees the first one, as there is no organization switching yet. Authentication and organizations require the database. The rest of the product features below are not implemented.
 
 ## Planned Scope
 
@@ -60,7 +60,7 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 │   │   ├── api/          # API client, auth and organization requests (cookie session, no stored tokens)
 │   │   ├── auth/         # auth state (React context)
 │   │   ├── components/   # shared UI: brand, header, loading screen, text and password fields
-│   │   ├── features/     # screens (auth, organizations: onboarding and workspace list)
+│   │   ├── features/     # screens (auth, organizations: onboarding, dashboard: layout, sidebar and overview)
 │   │   └── styles/       # design tokens and global CSS
 │   └── .env.example
 ├── server/               # Express API

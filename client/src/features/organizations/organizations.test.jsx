@@ -71,7 +71,7 @@ describe('after sign-in', () => {
     expect(screen.queryByLabelText(/slug/i)).toBeNull();
   });
 
-  it('skips onboarding and lists each organization with the user’s role', async () => {
+  it('skips onboarding and shows the dashboard for the first organization', async () => {
     renderApp({
       [`GET ${ORGANIZATIONS_URL}`]: () =>
         json(200, {
@@ -82,14 +82,10 @@ describe('after sign-in', () => {
         }),
     });
 
-    await screen.findByRole('heading', { name: 'Your workspaces' });
+    await screen.findByRole('heading', { name: 'Dashboard' });
     expect(screen.queryByRole('heading', { name: 'Create your workspace' })).toBeNull();
-    const rows = within(screen.getByRole('list', { name: 'Your organizations' })).getAllByRole('listitem');
-    expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/Acme Logistics.*Owner$/),
-      expect.stringMatching(/Globex.*Member$/),
-    ]);
-    expect(screen.getByText(/Operations dashboard/)).toBeTruthy();
+    expect(within(screen.getByRole('banner')).getByText('Acme Logistics')).toBeTruthy();
+    expect(screen.queryByText(/Globex/)).toBeNull();
   });
 
   it('returns to sign-in when the session has expired', async () => {
@@ -143,20 +139,21 @@ describe('onboarding', () => {
     expect(screen.getByLabelText('Organization name').getAttribute('aria-describedby')).toContain('organization-name-hint');
   });
 
-  it('creates the organization with the trimmed name and generated slug, then shows it without reloading', async () => {
+  it('creates the organization with the trimmed name and generated slug, then shows its dashboard without reloading', async () => {
     const fetchMock = await renderOnboarding({ [`POST ${ORGANIZATIONS_URL}`]: created });
     typeName('  Acme Logistics ');
 
     submit();
 
-    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
     const [[, init]] = requestsTo(fetchMock, 'POST', ORGANIZATIONS_URL);
     expect(init.credentials).toBe('same-origin');
     expect(JSON.parse(init.body)).toEqual({ name: 'Acme Logistics', slug: 'acme-logistics' });
 
     expect(screen.getByRole('status').textContent).toBe('Acme Logistics is ready. You’re its owner.');
-    const [row] = within(screen.getByRole('list', { name: 'Your organizations' })).getAllByRole('listitem');
-    expect(row.textContent).toMatch(/Acme Logistics.*acme-logistics.*Owner/);
+    expect(screen.getByRole('heading', { name: 'Welcome, ada' })).toBeTruthy();
+    expect(within(screen.getByRole('banner')).getByText('Acme Logistics')).toBeTruthy();
+    expect(screen.getByText('Owner')).toBeTruthy();
     expect(requestsTo(fetchMock, 'GET', ORGANIZATIONS_URL)).toHaveLength(1);
   });
 
@@ -177,7 +174,7 @@ describe('onboarding', () => {
     expect(requestsTo(fetchMock, 'POST', ORGANIZATIONS_URL)).toHaveLength(1);
 
     finish(created());
-    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
   });
 
   it('explains a taken name and keeps what the user typed', async () => {
@@ -239,7 +236,7 @@ describe('onboarding', () => {
     await renderOnboarding({ [`POST ${ORGANIZATIONS_URL}`]: created });
     typeName('Acme Logistics');
     submit();
-    await screen.findByRole('heading', { name: 'Your workspaces' });
+    await screen.findByRole('heading', { name: 'Dashboard' });
 
     expect(Storage.prototype.setItem).not.toHaveBeenCalled();
     expect(console.log).not.toHaveBeenCalled();

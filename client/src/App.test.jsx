@@ -75,7 +75,7 @@ describe('startup', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
     expect(screen.getAllByText(USER.email).length).toBeGreaterThan(0);
   });
 
@@ -151,14 +151,14 @@ describe('sign-in screen', () => {
     expect(password.getAttribute('type')).toBe('password');
   });
 
-  it('signs in with the trimmed email and the password, then shows the signed-in screen', async () => {
+  it('signs in with the trimmed email and the password, then shows the dashboard', async () => {
     const fetchMock = await renderSignedOut({ 'POST /api/v1/auth/login': () => json(200, { user: USER }) });
     fillIn('Email', '  ada@example.com ');
     fillIn('Password', PASSWORD);
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
     const [[, init]] = requestsTo(fetchMock, 'POST', '/api/v1/auth/login');
     expect(init.credentials).toBe('same-origin');
     expect(init.headers['Content-Type']).toBe('application/json');
@@ -224,7 +224,7 @@ describe('sign-in screen', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/v1/auth/login')).toHaveLength(1);
 
     finishLogin(json(200, { user: USER }));
-    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
   });
 });
 
@@ -239,7 +239,7 @@ describe('creating an account', () => {
     fillIn('Password', PASSWORD);
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(await screen.findByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
     const [[, init]] = requestsTo(fetchMock, 'POST', '/api/v1/auth/register');
     expect(JSON.parse(init.body)).toEqual({ email: 'ada@example.com', password: PASSWORD });
   });
@@ -270,7 +270,7 @@ describe('signed in', () => {
   async function renderSignedIn(handlers = {}) {
     const fetchMock = mockApi({ 'GET /api/v1/auth/me': () => json(200, { user: USER }), ...handlers });
     render(<App />);
-    await screen.findByRole('heading', { name: 'Your workspaces' });
+    await screen.findByRole('heading', { name: 'Dashboard' });
     return fetchMock;
   }
 
@@ -295,7 +295,7 @@ describe('signed in', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect((await screen.findByRole('alert')).textContent).toBe('We couldn’t sign you out. Please try again.');
-    expect(screen.getByRole('heading', { name: 'Your workspaces' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' }).disabled).toBe(false);
   });
 });
@@ -309,7 +309,7 @@ describe('security', () => {
     fillIn('Email', 'ada@example.com');
     fillIn('Password', PASSWORD);
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await screen.findByRole('heading', { name: 'Your workspaces' });
+    await screen.findByRole('heading', { name: 'Dashboard' });
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await screen.findByRole('heading', { name: 'Welcome back' });
 
@@ -322,7 +322,7 @@ describe('security', () => {
     mockApi({ 'GET /api/v1/auth/me': () => json(200, { user: USER }) });
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Your workspaces' });
+    await screen.findByRole('heading', { name: 'Dashboard' });
 
     expect(within(screen.getByRole('banner')).getByText(USER.email)).toBeTruthy();
     await waitFor(() => expect(document.cookie).toBe(''));

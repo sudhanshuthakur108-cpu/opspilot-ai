@@ -1,0 +1,290 @@
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  height: 100vh;
+  height: 100dvh;
+  padding: 0 var(--space-3) var(--space-5);
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+/* Same height as the header, so the two bottom borders line up. */
+.sidebar__top {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  margin: 0 calc(-1 * var(--space-3));
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar .sidebar__close {
+  display: none;
+  margin-right: calc(-1 * var(--space-2));
+}
+
+.sidebar__workspace {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.sidebar__avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-sm);
+}
+
+.sidebar__workspace-details {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.sidebar__workspace-name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar__workspace-role {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.sidebar__nav {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.sidebar__section-title {
+  margin-bottom: var(--space-2);
+  padding: 0 var(--space-3);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.sidebar__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+
+.sidebar__link .icon {
+  flex-shrink: 0;
+}
+
+a.sidebar__link {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+a.sidebar__link:hover {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+/* The transparent outline shows up in forced-colors mode, where box shadows are dropped. */
+a.sidebar__link:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
+}
+
+.sidebar__link[aria-current='page'] {
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+/* A bar at the sidebar's edge marks the current page without relying on color alone. */
+.sidebar__link[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: calc(-1 * var(--space-3));
+  width: 3px;
+  background: var(--color-primary);
+  border-radius: 0 3px 3px 0;
+}
+
+.sidebar__link--upcoming {
+  cursor: default;
+}
+
+.sidebar__link--upcoming .icon {
+  color: var(--color-text-subtle);
+}
+
+.sidebar__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar__soon {
+  flex-shrink: 0;
+  padding: 0 0.4375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.sidebar__account {
+  display: none;
+}
+
+/* Medium screens: an icon rail. Text stays available to screen readers and as tooltips. */
+@media (min-width: 768px) and (max-width: 1079.98px) {
+  .sidebar {
+    align-items: center;
+    padding: 0 var(--space-4) var(--space-5);
+  }
+
+  .sidebar__top {
+    align-self: stretch;
+    justify-content: center;
+    margin: 0 calc(-1 * var(--space-4));
+    padding: 0;
+  }
+
+  .sidebar .brand__name,
+  .sidebar__workspace-details,
+  .sidebar__section-title,
+  .sidebar__label,
+  .sidebar__soon {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .sidebar__workspace {
+    padding: var(--space-1);
+  }
+
+  .sidebar__nav {
+    gap: var(--space-4);
+  }
+
+  .sidebar__section + .sidebar__section {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .sidebar__link {
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .sidebar__link[aria-current='page']::before {
+    left: calc(-1 * var(--space-4));
+  }
+
+  .sidebar__link--upcoming {
+    opacity: 0.75;
+  }
+}
+
+/* Small screens: an off-canvas drawer. `visibility` keeps the closed drawer out of the tab order. */
+@media (max-width: 767.98px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(288px, calc(100vw - 3rem));
+    box-shadow: var(--shadow-card);
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition:
+      transform 0.2s ease,
+      visibility 0s linear 0.2s;
+  }
+
+  .sidebar--open {
+    visibility: visible;
+    transform: none;
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar .sidebar__close {
+    display: inline-flex;
+  }
+
+  .sidebar__account {
+    display: grid;
+    margin-top: auto;
+    padding: var(--space-4) var(--space-3) 0;
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .sidebar__account-label {
+    color: var(--color-text-muted);
+  }
+
+  .sidebar__account-email {
+    overflow: hidden;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar--open,
+  a.sidebar__link {
+    transition: none;
+  }
+}

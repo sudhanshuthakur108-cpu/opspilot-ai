@@ -4,7 +4,7 @@ import { listOrganizations } from '../../api/organizations.js';
 import { useAuth } from '../../auth/authContext.js';
 import { AppHeader } from '../../components/AppHeader.jsx';
 import { LoadingScreen } from '../../components/LoadingScreen.jsx';
-import { SignedInScreen } from '../auth/SignedInScreen.jsx';
+import { Dashboard } from '../dashboard/Dashboard.jsx';
 import { OnboardingScreen } from './OnboardingScreen.jsx';
 
 function LoadFailed({ message, onRetry }) {
@@ -27,7 +27,7 @@ function LoadFailed({ message, onRetry }) {
 }
 
 // Everything behind sign-in starts here: load the user's organizations, then either onboard
-// them (no organizations yet) or show the home screen.
+// them (no organizations yet) or show the dashboard.
 export function Workspace() {
   const { endSession } = useAuth();
   const [organizations, setOrganizations] = useState(null);
@@ -70,5 +70,8 @@ export function Workspace() {
   if (loadError) return <LoadFailed message={loadError} onRetry={retry} />;
   if (!organizations) return <LoadingScreen label="Loading your workspaces…" />;
   if (organizations.length === 0) return <OnboardingScreen onCreated={handleCreated} />;
-  return <SignedInScreen organizations={organizations} createdOrganizationId={createdOrganizationId} />;
+
+  // There is no organization switcher yet, so a member of several organizations sees the first.
+  const [organization] = organizations;
+  return <Dashboard organization={organization} justCreated={organization.id === createdOrganizationId} />;
 }

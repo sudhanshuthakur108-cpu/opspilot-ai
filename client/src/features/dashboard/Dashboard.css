@@ -1,0 +1,99 @@
+.dashboard {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.dashboard__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboard-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.dashboard-header .app-header__inner {
+  max-width: none;
+  padding: 0 var(--space-6);
+}
+
+.dashboard-header__start {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Scoped to the header to win over .icon-button, whose global styles load later. */
+.dashboard-header .dashboard-header__menu {
+  display: none;
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.dashboard-header__heading {
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.dashboard-header__context {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dashboard-header__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.dashboard__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(16 24 40 / 0.45);
+  animation: backdrop-in 0.2s ease;
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The page behind the open drawer should not scroll. */
+body:has(.dashboard--menu-open) {
+  overflow: hidden;
+}
+
+@media (max-width: 1079.98px) {
+  .dashboard {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .dashboard {
+    display: block;
+  }
+
+  .dashboard-header .app-header__inner {
+    padding: 0 var(--space-4);
+  }
+
+  .dashboard-header .dashboard-header__menu {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard__backdrop {
+    animation: none;
+  }
+}
