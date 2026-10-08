@@ -31,4 +31,10 @@ export const membershipStore = {
     const doc = await Membership.findOne({ organizationId, userId }).lean();
     return doc && toMembership(doc);
   },
+
+  // Served by the { userId: 1 } index.
+  async listForUser(userId) {
+    const docs = await Membership.find({ userId }).lean();
+    return docs.map(toMembership);
+  },
 };

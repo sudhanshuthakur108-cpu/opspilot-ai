@@ -26,3 +26,16 @@ export async function createOrganizationWithOwner(
     return { organization, membership };
   });
 }
+
+// The organizations `userId` belongs to, newest first, each with the user's role in it.
+// Only organizations reached through the user's memberships are ever loaded.
+export async function listOrganizationsForUser({ organizations, memberships }, userId) {
+  const userMemberships = await memberships.listForUser(userId);
+  if (userMemberships.length === 0) {
+    return [];
+  }
+
+  const roles = new Map(userMemberships.map((membership) => [membership.organizationId, membership.role]));
+  const found = await organizations.findByIds([...roles.keys()]);
+  return found.map((organization) => ({ ...organization, role: roles.get(organization.id) }));
+}

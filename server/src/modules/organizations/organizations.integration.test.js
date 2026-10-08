@@ -74,6 +74,31 @@ describe.skipIf(!uri)('organizations against MongoDB', () => {
     expect(await Membership.countDocuments()).toBe(0);
   });
 
+  it('lists only the memberships of the given user', async () => {
+    const userId = newId();
+    await membershipStore.create({ organizationId: newId(), userId, role: 'owner' });
+    await membershipStore.create({ organizationId: newId(), userId, role: 'member' });
+    await membershipStore.create({ organizationId: newId(), userId: newId(), role: 'owner' });
+
+    const memberships = await membershipStore.listForUser(userId);
+
+    expect(memberships.map((membership) => membership.role).sort()).toEqual(['member', 'owner']);
+    expect(memberships.every((membership) => membership.userId === userId)).toBe(true);
+  });
+
+  // Also proves the trusted `$in` survives sanitizeFilter, which connectDatabase turns on.
+  it('finds only the requested organizations, newest first', async () => {
+    const first = await organizationStore.create({ name: 'First', slug: 'first' });
+    const second = await organizationStore.create({ name: 'Second', slug: 'second' });
+    const third = await organizationStore.create({ name: 'Third', slug: 'third' });
+    await organizationStore.create({ name: 'Not requested', slug: 'not-requested' });
+
+    const found = await organizationStore.findByIds([first.id, third.id, second.id]);
+
+    expect(found.map((organization) => organization.slug)).toEqual(['third', 'second', 'first']);
+    expect(await organizationStore.findByIds([])).toEqual([]);
+  });
+
   describe('createOrganizationWithOwner', () => {
     it('creates the organization with an owner membership', async ({ skip }) => {
       if (!transactionsAvailable) skip();

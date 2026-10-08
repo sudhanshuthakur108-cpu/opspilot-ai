@@ -32,7 +32,7 @@ function createOrganization(app, cookie, body) {
   return request(app).post('/api/v1/organizations').set('Origin', ORIGIN).set('Cookie', cookie).send(body);
 }
 
-describe.skipIf(!uri)('POST /api/v1/organizations against MongoDB', () => {
+describe.skipIf(!uri)('/api/v1/organizations against MongoDB', () => {
   let transactionsAvailable = false;
 
   beforeAll(async () => {
@@ -79,6 +79,24 @@ describe.skipIf(!uri)('POST /api/v1/organizations against MongoDB', () => {
     expect(response.body.error.code).toBe('SLUG_UNAVAILABLE');
     expect(await Organization.countDocuments()).toBe(1);
     expect(await Membership.countDocuments()).toBe(1);
+  });
+
+  it('lists only the organizations of the signed-in user, newest first, with roles', async ({ skip }) => {
+    if (!transactionsAvailable) skip();
+    const app = appWith();
+    const ada = await signUp(app, { origin: ORIGIN });
+    const grace = await signUp(app, { origin: ORIGIN, email: 'grace@example.com' });
+    await createOrganization(app, ada.cookie, { name: 'Older', slug: 'older' });
+    await createOrganization(app, grace.cookie, { name: 'Grace Co', slug: 'grace-co' });
+    await createOrganization(app, ada.cookie, { name: 'Newer', slug: 'newer' });
+
+    const response = await request(app).get('/api/v1/organizations').set('Cookie', ada.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.organizations.map(({ slug, role }) => ({ slug, role }))).toEqual([
+      { slug: 'newer', role: 'owner' },
+      { slug: 'older', role: 'owner' },
+    ]);
   });
 
   it('rolls back the organization when the membership write fails', async ({ skip }) => {

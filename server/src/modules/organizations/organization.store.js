@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { isDuplicateKeyError } from '../../lib/database.js';
 import { Organization } from './organization.model.js';
 
@@ -27,5 +28,15 @@ export const organizationStore = {
   async findById(id) {
     const doc = await Organization.findById(id).lean();
     return doc && toOrganization(doc);
+  },
+
+  // Newest first. Ties on createdAt fall back to _id, which also grows over time.
+  async findByIds(ids) {
+    // sanitizeFilter would neutralize `$in`; it is marked trusted because callers pass IDs
+    // from the user's own memberships, never from the request.
+    const docs = await Organization.find({ _id: mongoose.trusted({ $in: ids }) })
+      .sort({ createdAt: -1, _id: -1 })
+      .lean();
+    return docs.map(toOrganization);
   },
 };

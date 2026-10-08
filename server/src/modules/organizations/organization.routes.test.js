@@ -264,3 +264,140 @@ describe('POST /api/v1/organizations', () => {
     expect(stores.organizations.records.size).toBe(0);
   });
 });
+
+describe('GET /api/v1/organizations', () => {
+  function listOrganizations(app, cookie) {
+    const req = request(app).get('/api/v1/organizations');
+    return cookie ? req.set('Cookie', cookie) : req;
+  }
+
+  it('returns an empty list for a user without organizations', async () => {
+    const { app } = setup();
+    const { cookie } = await signUp(app, { origin: ORIGIN });
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toEqual({ organizations: [] });
+  });
+
+  it('returns the organizations the user belongs to, with their role', async () => {
+    const { app } = setup();
+    const { cookie } = await signUp(app, { origin: ORIGIN });
+    const created = await createOrganization(app, cookie, ACME);
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      organizations: [{ ...created.body.organization, role: 'owner' }],
+    });
+  });
+
+  it('includes organizations the user joined with another role', async () => {
+    const { app, stores } = setup();
+    const owner = await signUp(app, { origin: ORIGIN, email: 'grace@example.com' });
+    const { user, cookie } = await signUp(app, { origin: ORIGIN });
+    const created = await createOrganization(app, owner.cookie, ACME);
+    await stores.memberships.create({
+      organizationId: created.body.organization.id,
+      userId: user.id,
+      role: 'admin',
+    });
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(response.body.organizations).toEqual([{ ...created.body.organization, role: 'admin' }]);
+  });
+
+  // Documented order: newest first by createdAt, ties broken by ID (later IDs are newer).
+  it('returns several organizations newest first', async () => {
+    const { app } = setup();
+    const { cookie } = await signUp(app, { origin: ORIGIN });
+    for (const slug of ['first', 'second', 'third']) {
+      await createOrganization(app, cookie, { name: slug, slug });
+    }
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(response.body.organizations.map((organization) => organization.slug)).toEqual([
+      'third',
+      'second',
+      'first',
+    ]);
+  });
+
+  it('never returns an organization of another user, whatever the request says', async () => {
+    const { app } = setup();
+    const ada = await signUp(app, { origin: ORIGIN });
+    const grace = await signUp(app, { origin: ORIGIN, email: 'grace@example.com' });
+    await createOrganization(app, ada.cookie, { name: 'Ada Co', slug: 'ada-co' });
+    await createOrganization(app, grace.cookie, { name: 'Grace Co', slug: 'grace-co' });
+
+    const response = await request(app)
+      .get(`/api/v1/organizations?userId=${grace.user.id}`)
+      .set('Cookie', ada.cookie)
+      .set('X-User-Id', grace.user.id)
+      .send({ userId: grace.user.id });
+
+    expect(response.status).toBe(200);
+    expect(response.body.organizations.map((organization) => organization.slug)).toEqual(['ada-co']);
+  });
+
+  it.each([
+    ['without a session cookie', undefined],
+    ['with an invalid session token', 'opspilot_session=not-a-jwt'],
+  ])('rejects a request %s with 401', async (_, cookie) => {
+    const { app } = setup();
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      error: {
+        code: 'UNAUTHENTICATED',
+        message: 'Authentication required',
+        requestId: response.headers['x-request-id'],
+      },
+    });
+  });
+
+  it('returns only the listed organization fields', async () => {
+    const { app, users } = setup();
+    const { cookie } = await signUp(app, { origin: ORIGIN });
+    await createOrganization(app, cookie, ACME);
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(Object.keys(response.body)).toEqual(['organizations']);
+    expect(Object.keys(response.body.organizations[0]).sort()).toEqual(['createdAt', 'id', 'name', 'role', 'slug']);
+    expect(response.headers['set-cookie']).toBeUndefined();
+
+    const [account] = users.records.values();
+    expect(response.text).not.toContain(account.passwordHash);
+    expect(response.text).not.toContain(cookie.split('=')[1]);
+    expect(response.text).not.toMatch(/password|tokenVersion|email|userId|_id|__v/i);
+  });
+
+  it('handles a store failure through the central error handler without leaking details', async () => {
+    const { app, stores, logs } = setup();
+    stores.memberships.listForUser = async () => {
+      throw new Error('connection lost to mongodb://app-user:pw-secret@db.example.com/opspilot');
+    };
+    const { cookie } = await signUp(app, { origin: ORIGIN });
+
+    const response = await listOrganizations(app, cookie);
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Something went wrong',
+        requestId: response.headers['x-request-id'],
+      },
+    });
+    expect(response.text).not.toMatch(/pw-secret|mongodb|stack/);
+    expect(JSON.stringify(logs.entries)).not.toContain('pw-secret');
+  });
+});

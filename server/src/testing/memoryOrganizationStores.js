@@ -1,13 +1,14 @@
-import { randomBytes } from 'node:crypto';
-
-const newId = () => randomBytes(12).toString('hex');
-
 // In-memory stand-ins for organization.store.js and membership.store.js with the same contracts
-// (null for a duplicate slug or membership). `withTransaction` just runs the work, so nothing is
-// rolled back on failure; rollback is covered against MongoDB by the integration tests.
+// (null for a duplicate slug or membership; newest-first ordering). `withTransaction` just runs
+// the work, so nothing is rolled back on failure; rollback is covered against MongoDB by the
+// integration tests.
 export function createMemoryOrganizationStores() {
   const organizationRecords = new Map();
   const membershipRecords = new Map();
+
+  // Increasing IDs, like ObjectIds, so ordering ties break the same way as in MongoDB.
+  let lastId = 0;
+  const newId = () => (++lastId).toString(16).padStart(24, '0');
 
   const organizations = {
     records: organizationRecords,
@@ -24,6 +25,14 @@ export function createMemoryOrganizationStores() {
     async findById(id) {
       const record = organizationRecords.get(id);
       return record ? { ...record } : null;
+    },
+
+    async findByIds(ids) {
+      return ids
+        .map((id) => organizationRecords.get(id))
+        .filter(Boolean)
+        .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+        .map((record) => ({ ...record }));
     },
   };
 
@@ -47,6 +56,12 @@ export function createMemoryOrganizationStores() {
         (candidate) => candidate.organizationId === organizationId && candidate.userId === userId,
       );
       return record ? { ...record } : null;
+    },
+
+    async listForUser(userId) {
+      return [...membershipRecords.values()]
+        .filter((record) => record.userId === userId)
+        .map((record) => ({ ...record }));
     },
   };
 
