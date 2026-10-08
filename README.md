@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`) and organizations for signed-in users (`POST /api/v1/organizations` creates one with the caller as owner; `GET /api/v1/organizations` lists the caller's organizations and roles), plus a React page that shows the API's status. Authentication and organizations require the database. The client has no sign-in or organization screens yet, and the rest of the product features below are not implemented.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`) and organizations for signed-in users (`POST /api/v1/organizations` creates one with the caller as owner; `GET /api/v1/organizations` lists the caller's organizations and roles), plus a React client with sign-in and account creation, session restore on load, sign-out, and a temporary signed-in screen in place of the dashboard. Authentication and organizations require the database. The client has no organization or dashboard screens yet, and the rest of the product features below are not implemented.
 
 ## Planned Scope
 
@@ -57,9 +57,11 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 .
 ├── client/               # React + Vite frontend
 │   ├── src/
-│   │   ├── api/          # API request functions
-│   │   ├── features/     # feature folders (currently: health)
-│   │   └── styles/       # global CSS
+│   │   ├── api/          # API client and auth requests (cookie session, no stored tokens)
+│   │   ├── auth/         # auth state (React context)
+│   │   ├── components/   # shared UI: brand, text and password fields
+│   │   ├── features/     # screens (currently: auth)
+│   │   └── styles/       # design tokens and global CSS
 │   └── .env.example
 ├── server/               # Express API
 │   ├── src/
@@ -88,7 +90,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` starts the API on <http://localhost:3000> and the Vite dev server on <http://localhost:5173>. Open the Vite URL; it proxies `/api` requests to the API.
+`npm run dev` starts the API on <http://localhost:3000> and the Vite dev server on <http://localhost:5173>. Open the Vite URL; it proxies `/api` requests to the API. Signing in needs the database (`MONGODB_URI` and `JWT_SECRET`, see [Configuration](#configuration)); without it the sign-in screen loads but sign-in requests fail.
 
 Other scripts, run from the repository root:
 

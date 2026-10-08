@@ -1,23 +1,31 @@
-import HealthStatus from './features/health/HealthStatus.jsx';
+import { AuthProvider } from './auth/AuthProvider.jsx';
+import { useAuth } from './auth/authContext.js';
+import { BrandMark } from './components/Brand.jsx';
+import { AuthScreen } from './features/auth/AuthScreen.jsx';
+import { SignedInScreen } from './features/auth/SignedInScreen.jsx';
+
+function StartupScreen() {
+  return (
+    <div className="startup" role="status">
+      <BrandMark />
+      <span className="spinner" aria-hidden="true" />
+      <span className="visually-hidden">Loading OpsPilot…</span>
+    </div>
+  );
+}
+
+function Screens() {
+  const { status } = useAuth();
+
+  if (status === 'loading') return <StartupScreen />;
+  if (status === 'authenticated') return <SignedInScreen />;
+  return <AuthScreen />;
+}
 
 export default function App() {
   return (
-    <>
-      <header className="site-header">
-        <div className="container">
-          <p className="site-header__name">OpsPilot AI</p>
-        </div>
-      </header>
-
-      <main className="container">
-        <h1>Operations management for teams</h1>
-        <p className="lead">
-          OpsPilot AI is in early development. Customers, orders, tasks and AI-assisted features are planned but
-          not built yet.
-        </p>
-
-        <HealthStatus />
-      </main>
-    </>
+    <AuthProvider>
+      <Screens />
+    </AuthProvider>
   );
 }

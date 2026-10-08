@@ -1,0 +1,107 @@
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.field__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.field__control {
+  display: flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.field__control:hover {
+  border-color: #b4bbc8;
+}
+
+.field__control:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.field__control--invalid,
+.field__control--invalid:hover {
+  border-color: var(--color-danger);
+}
+
+.field__control--invalid:focus-within {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 4px rgb(217 45 32 / 0.14);
+}
+
+.field__control:has(.field__input:disabled) {
+  background: var(--color-surface-muted);
+}
+
+.field__input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 0.875rem;
+  border: 0;
+  border-radius: inherit;
+  /* 16px keeps iOS Safari from zooming into the field. */
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  background: transparent;
+  outline: none;
+}
+
+.field__input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.field__input:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.field__input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 100px var(--color-surface) inset;
+  -webkit-text-fill-color: var(--color-text);
+}
+
+.field__toggle {
+  flex-shrink: 0;
+  margin-right: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.field__toggle:hover:not(:disabled) {
+  color: var(--color-text);
+  background: #f0f2f5;
+}
+
+.field__toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+.field__toggle:disabled {
+  cursor: not-allowed;
+}
+
+.field__error {
+  font-size: var(--text-xs);
+  color: var(--color-danger-text);
+}
