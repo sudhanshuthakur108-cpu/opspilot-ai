@@ -101,7 +101,7 @@ opspilot-ai/
 
 ## 4. Planned API Route Groups
 
-All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations` and `GET /organizations` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:orgId`, so the active organization is explicit in every request and checked against the user's memberships.
+All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations` and `GET /organizations` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
 
 **Common conventions (planned):**
 
@@ -114,7 +114,7 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 | --- | --- | --- |
 | **Health** | `GET /health` (liveness; **implemented**)<br>`GET /ready` (readiness; **implemented**: reports the MongoDB connection state when a database is configured, with 503 when it is not connected) | Public |
 | **Auth** (**implemented**) | `POST /auth/register`<br>`POST /auth/login`<br>`POST /auth/logout`<br>`GET /auth/me` | Public, except `me`. `logout` works with or without a valid session. All return 503 when no database is configured. |
-| **Organizations** | `POST /organizations` (**implemented**)<br>`GET /organizations` (my organizations; **implemented**)<br>`GET /organizations/:orgId`<br>`PATCH /organizations/:orgId`<br>`GET /organizations/:orgId/members` | Authenticated. `POST` makes the caller the owner; `GET /organizations` lists only the caller's organizations. The other routes require membership, and changes need an admin role. |
+| **Organizations** | `POST /organizations` (**implemented**)<br>`GET /organizations` (my organizations; **implemented**)<br>`GET /organizations/:organizationId`<br>`PATCH /organizations/:organizationId`<br>`GET /organizations/:organizationId/members` | Authenticated. `POST` makes the caller the owner; `GET /organizations` lists only the caller's organizations. The other routes require membership, and changes need an admin role. |
 
 **`POST /organizations` (implemented):**
 
@@ -130,12 +130,12 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 - Order: newest first by the organization's `createdAt`, with ties broken by ID (newer IDs first).
 - The lookup goes through memberships: the user's memberships (by the `userId` index), then only those organizations (by `_id`). No organization outside the user's memberships is ever loaded.
 - No pagination yet. A user is expected to belong to few organizations.
-| **Customers** | `GET`, `POST /organizations/:orgId/customers`<br>`GET`, `PATCH`, `DELETE /organizations/:orgId/customers/:id` | Org member |
-| **Orders** | `GET`, `POST /organizations/:orgId/orders`<br>`GET`, `PATCH`, `DELETE /organizations/:orgId/orders/:id` | Org member |
-| **Tasks** | `GET`, `POST /organizations/:orgId/tasks`<br>`GET`, `PATCH`, `DELETE /organizations/:orgId/tasks/:id` | Org member |
-| **AI tools** | `POST /organizations/:orgId/ai/summarize`<br>`POST /organizations/:orgId/ai/suggest-next-steps` | Org member; rate limited |
-| **Approvals** | `GET /organizations/:orgId/approvals`<br>`GET /organizations/:orgId/approvals/:id`<br>`POST /organizations/:orgId/approvals/:id/approve`<br>`POST /organizations/:orgId/approvals/:id/reject` | Org member; deciding needs a permitted role |
-| **Audit logs** | `GET /organizations/:orgId/audit-logs` | Org admin; read-only (there are no write endpoints) |
+| **Customers** | `GET`, `POST /organizations/:organizationId/customers`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/customers/:id` | Org member |
+| **Orders** | `GET`, `POST /organizations/:organizationId/orders`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/orders/:id` | Org member |
+| **Tasks** | `GET`, `POST /organizations/:organizationId/tasks`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
+| **AI tools** | `POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited |
+| **Approvals** | `GET /organizations/:organizationId/approvals`<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve`<br>`POST /organizations/:organizationId/approvals/:id/reject` | Org member; deciding needs a permitted role |
+| **Audit logs** | `GET /organizations/:organizationId/audit-logs` | Org admin; read-only (there are no write endpoints) |
 
 **Relationships between resources (planned):** an order references a customer. A task may optionally reference a customer or an order. Every reference must point to a record in the **same organization**, and the server checks this on create and update.
 
@@ -162,8 +162,8 @@ sequenceDiagram
     participant D as MongoDB
 
     U->>C: Ask for a suggestion
-    C->>A: POST /organizations/:orgId/ai/suggest-next-steps
-    A->>D: Load source record (scoped to orgId)
+    C->>A: POST /organizations/:organizationId/ai/suggest-next-steps
+    A->>D: Load source record (scoped to organizationId)
     A->>P: Minimal, validated input
     P-->>A: Suggestion
     A->>A: Validate output shape and length
@@ -175,7 +175,7 @@ sequenceDiagram
         A->>D: Save pending approval + audit log entry
         A-->>C: 201 Created (pending approval)
         U->>C: Approve
-        C->>A: POST /organizations/:orgId/approvals/:id/approve
+        C->>A: POST /organizations/:organizationId/approvals/:id/approve
         A->>D: Re-check role and target, apply stored proposal, mark approved, audit log
         A-->>C: 200 OK
     end
@@ -205,15 +205,18 @@ sequenceDiagram
 - **Brute-force protection:** login and register share a limit of 10 attempts per client IP per 15 minutes (in memory, per instance). The IP is only correct once the `trust proxy` setting is configured (see [Section 6](#error-handling-planned)). A per-account login limit is still planned. Login failures return a generic message that does not reveal whether the email exists, and an unknown email still runs a full password verification so response timing is similar.
 - **Registration** returns 409 for an email that is already registered. This reveals that the account exists, which cannot be avoided without email verification; the rate limit slows scanning.
 
-### Organization-level data isolation (planned)
+### Organization-level data isolation (membership checks implemented; no organization-owned resources yet)
 
 - Every organization-owned document stores an `organizationId`, and its indexes start with `organizationId`.
 - A membership collection links users to organizations and stores a role: `owner`, `admin` or `member`, defined once in `modules/organizations/roles.js`. What each role may do is still undecided.
-- **Implemented:** the Organization model (unique `slug`), the Membership model (one membership per user per organization), their stores, and a service that creates an organization together with its owner membership in a single transaction, so an organization never exists without an owner. The membership middleware and organization routes below are not built yet.
-- Middleware on `/organizations/:orgId/*` checks the user's membership of `:orgId` against the database on every request, so a removed membership takes effect immediately. It then attaches the organization and role to the request.
-  - A non-member gets **404**.
-  - A member without the required role gets **403**.
-- Services take `orgId` from that request context, never from the request body, and every database query on organization data includes it.
+- **Implemented:** the Organization model (unique `slug`), the Membership model (one membership per user per organization), their stores, and a service that creates an organization together with its owner membership in a single transaction, so an organization never exists without an owner.
+- **Implemented:** membership middleware for routes under `/organizations/:organizationId/...`, in `modules/organizations/organization.middleware.js`. No route uses it yet. It runs on every request, so a removed membership takes effect immediately.
+  - `createRequireMembership({ requireAuth, memberships })` returns `[requireAuth, checkMembership]`, so authentication always runs first.
+  - It checks the `:organizationId` route parameter against the authenticated user's ID with `memberships.find`. A user ID, role or organization ID anywhere else in the request is ignored.
+  - It attaches only `req.membership = { id, organizationId, userId, role }`.
+  - Responses: no valid session gets **401** `UNAUTHENTICATED` (checked before anything else). A malformed ID gets **400** `VALIDATION_FAILED`, before any lookup. A non-member gets **404** `NOT_FOUND` ("Organization not found"), identical to an organization that does not exist.
+  - `requireOrganizationRole(...roles)` runs after it: a member without one of the roles gets **403** `FORBIDDEN`. An empty or unknown role list throws when the route is defined, and using it without the membership middleware fails closed with a 500.
+- Services take `organizationId` from that request context, never from the request body, and every database query on organization data includes it.
 - Validation schemas strip unknown fields, so a client cannot set `organizationId`, `role` or other server-controlled fields (mass assignment).
 - Requesting another organization's record returns **404**, not 403, so the response does not reveal that the record exists.
 - Each organization-owned module must include isolation tests showing that a user in organization A cannot read, update or delete organization B's data.
@@ -317,7 +320,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
-| **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations` and `GET /organizations` are implemented and tested against a temporary MongoDB replica set; membership middleware, the other organization routes and isolation tests are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
+| **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; no route uses the middleware yet, and the other organization routes and per-resource isolation tests are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
 | **6. Audit log service** | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
 | **7. Customers** | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
 | **8. Orders and tasks** | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
