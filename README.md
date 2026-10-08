@@ -13,7 +13,7 @@ OpsPilot AI is a planned operations management SaaS for teams. Teams will be abl
 - **Human approvals:** an AI suggestion that would change data is saved as a pending approval. It is applied only after a permitted team member approves it. Output that doesn't change data, such as a summary, is returned directly.
 - **Audit logs:** a read-only record of data changes, approval decisions and AI tool use within an organization.
 
-Record fields, statuses, roles and permissions are not decided yet. They are tracked as [open questions](docs/ARCHITECTURE.md#9-open-questions).
+Record fields, statuses and what each role (`owner`, `admin`, `member`) may do are not decided yet. They are tracked as [open questions](docs/ARCHITECTURE.md#9-open-questions).
 
 ## Stack
 
@@ -22,7 +22,7 @@ Record fields, statuses, roles and permissions are not decided yet. They are tra
 | Frontend | React 19, Vite 8, plain CSS                                  | In use  |
 | Backend  | Node.js, Express 5 (REST API), helmet                        | In use  |
 | Testing  | Vitest, Supertest, React Testing Library (jsdom)             | In use  |
-| Database | MongoDB through Mongoose 9 (user accounts only so far)       | In use  |
+| Database | MongoDB through Mongoose 9 (users, organizations, memberships) | In use |
 | Auth     | Argon2id (`@node-rs/argon2`), JWT session cookie (`jose`), `express-rate-limit` | In use |
 | AI       | Server-side provider interface: `mock` (default) or `openai` | Planned |
 
@@ -67,7 +67,7 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 │   │   ├── lib/          # database connection, logger, error class, redaction
 │   │   ├── middleware/   # request IDs, logging, same-origin check, 404 and errors
 │   │   ├── testing/      # test helpers (logger and user-store stand-ins)
-│   │   ├── modules/      # feature modules (health, auth, users)
+│   │   ├── modules/      # feature modules (health, auth, users, organizations)
 │   │   ├── app.js        # builds the Express app (used by tests)
 │   │   └── server.js     # validates config and starts listening
 │   └── .env.example
@@ -97,6 +97,12 @@ Other scripts, run from the repository root:
 | `npm test`      | Runs the server tests, then the client tests                       |
 | `npm run build` | Builds the client for production into `client/dist/`               |
 | `npm start -w server` | Starts the API without file watching                         |
+
+`npm test` needs no database. The database integration tests (`*.integration.test.js`) are skipped unless `MONGODB_TEST_URI` points at a MongoDB replica set, which transactions require. Each run creates a randomly named database and drops only that one. To run them against a temporary local replica set (this downloads a MongoDB server binary on first use):
+
+```bash
+npx @mongodb-js/mongodb-runner exec -t replset -- node -e "require('node:child_process').execSync('npm test -w server', { stdio: 'inherit', env: { ...process.env, MONGODB_TEST_URI: process.env.MONGODB_URI } })"
+```
 
 ## Configuration
 

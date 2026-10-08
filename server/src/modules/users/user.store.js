@@ -1,6 +1,5 @@
+import { isDuplicateKeyError } from '../../lib/database.js';
 import { User } from './user.model.js';
-
-const DUPLICATE_KEY_ERROR = 11000;
 
 // Plain objects keep Mongoose documents, and the password hash, out of route code.
 function toUser(doc) {
@@ -18,7 +17,7 @@ export const userStore = {
     try {
       return toUser(await User.create({ email, passwordHash }));
     } catch (error) {
-      if (error.code === DUPLICATE_KEY_ERROR) {
+      if (isDuplicateKeyError(error)) {
         return null;
       }
       throw error;

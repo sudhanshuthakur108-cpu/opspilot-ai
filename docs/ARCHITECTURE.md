@@ -193,7 +193,8 @@ sequenceDiagram
 ### Organization-level data isolation (planned)
 
 - Every organization-owned document stores an `organizationId`, and its indexes start with `organizationId`.
-- A membership collection links users to organizations and stores a role. The initial roles are assumed to be `admin` and `member`, to be confirmed when the organizations module is built.
+- A membership collection links users to organizations and stores a role: `owner`, `admin` or `member`, defined once in `modules/organizations/roles.js`. What each role may do is still undecided.
+- **Implemented:** the Organization model (unique `slug`), the Membership model (one membership per user per organization), their stores, and a service that creates an organization together with its owner membership in a single transaction, so an organization never exists without an owner. The membership middleware and organization routes below are not built yet.
 - Middleware on `/orgs/:orgId/*` checks the user's membership of `:orgId` against the database on every request, so a removed membership takes effect immediately. It then attaches the organization and role to the request.
   - A non-member gets **404**.
   - A member without the required role gets **403**.
@@ -262,7 +263,7 @@ Planned variables are added to `server/.env.example` in the phase that first use
 
 ### Testing strategy (planned)
 
-Tests focus on behavior that matters, following `CLAUDE.md`. Vitest runs both test suites. The server uses Supertest for HTTP tests, and the client uses React Testing Library with jsdom. mongodb-memory-server (an isolated test database) remains a *candidate*.
+Tests focus on behavior that matters, following `CLAUDE.md`. Vitest runs both test suites. The server uses Supertest for HTTP tests, and the client uses React Testing Library with jsdom. Database integration tests (`*.integration.test.js`) run only when `MONGODB_TEST_URI` is set; each run uses a new, randomly named database and drops it afterwards. No in-memory MongoDB package is installed: locally, `@mongodb-js/mongodb-runner` (run with `npx`) can start a temporary replica set.
 
 | Level | Focus |
 | --- | --- |
@@ -271,7 +272,7 @@ Tests focus on behavior that matters, following `CLAUDE.md`. Vitest runs both te
 | AI provider | The `openai` provider tested with a mocked HTTP layer. **Automated tests never call the real OpenAI API.** |
 | Client | Key components and forms (React Testing Library), with API calls mocked |
 
-Tests for code that uses MongoDB transactions need a replica-set test database, because a standalone instance does not support transactions. mongodb-memory-server has a replica-set mode for this.
+Tests for code that uses MongoDB transactions need a replica-set test database, because a standalone instance does not support transactions. The transaction tests skip themselves on a standalone server.
 
 A CI workflow that runs lint and tests on each push (*candidate:* GitHub Actions) is planned once there is code to test.
 
@@ -301,7 +302,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
-| **5. Organizations and isolation** | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
+| **5. Organizations and isolation** (**In progress**: models, roles, stores and transactional organization creation are implemented and tested against a temporary MongoDB replica set; membership middleware, routes and isolation tests are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
 | **6. Audit log service** | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
 | **7. Customers** | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
 | **8. Orders and tasks** | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
