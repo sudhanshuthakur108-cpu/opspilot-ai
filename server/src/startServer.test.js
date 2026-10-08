@@ -2,7 +2,9 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { startServer } from './startServer.js';
 import { captureLogger } from './testing/captureLogger.js';
+import { createMemoryOrganizationStores } from './testing/memoryOrganizationStores.js';
 import { createMemoryUserStore } from './testing/memoryUserStore.js';
+import { signUp } from './testing/signUp.js';
 
 const DATABASE_URI = 'mongodb://app-user:pw-secret@db.example.com/opspilot';
 const CLIENT_ORIGIN = 'http://localhost:5173';
@@ -19,7 +21,9 @@ function configWith(uri) {
 
 function fakeDatabase() {
   let state = 'disconnected';
+  const { withTransaction } = createMemoryOrganizationStores();
   return {
+    withTransaction,
     connect: vi.fn(async () => {
       state = 'connected';
     }),
@@ -34,7 +38,15 @@ function fakeDatabase() {
 }
 
 function start(uri, { database = fakeDatabase(), logger = captureLogger() } = {}) {
-  return startServer({ config: configWith(uri), logger, database, users: createMemoryUserStore() });
+  const { organizations, memberships } = createMemoryOrganizationStores();
+  return startServer({
+    config: configWith(uri),
+    logger,
+    database,
+    users: createMemoryUserStore(),
+    organizations,
+    memberships,
+  });
 }
 
 describe('startServer with a database', () => {
@@ -69,6 +81,20 @@ describe('startServer with a database', () => {
       .post('/api/v1/auth/register')
       .set('Origin', CLIENT_ORIGIN)
       .send({ email: 'ada@example.com', password: 'correct horse battery' });
+
+    expect(response.status).toBe(201);
+    await shutdown('SIGTERM');
+  });
+
+  it('enables organization creation', async () => {
+    const { server, shutdown } = await start(DATABASE_URI);
+    const { cookie } = await signUp(server, { origin: CLIENT_ORIGIN });
+
+    const response = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Acme', slug: 'acme' });
 
     expect(response.status).toBe(201);
     await shutdown('SIGTERM');
@@ -125,6 +151,13 @@ describe('startServer without a database', () => {
     const me = await request(server).get('/api/v1/auth/me');
     expect(me.status).toBe(503);
     expect(me.body.error.code).toBe('AUTH_UNAVAILABLE');
+
+    const organizations = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .send({ name: 'Acme', slug: 'acme' });
+    expect(organizations.status).toBe(503);
+    expect(organizations.body.error.code).toBe('AUTH_UNAVAILABLE');
 
     await shutdown('SIGTERM');
     expect(database.disconnect).not.toHaveBeenCalled();

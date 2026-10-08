@@ -1,7 +1,9 @@
 import { loadConfig } from './config/env.js';
-import { connectDatabase, databaseState, disconnectDatabase } from './lib/database.js';
+import { connectDatabase, databaseState, disconnectDatabase, withTransaction } from './lib/database.js';
 import { logger } from './lib/logger.js';
 import { redactConnectionStrings } from './lib/redact.js';
+import { membershipStore } from './modules/organizations/membership.store.js';
+import { organizationStore } from './modules/organizations/organization.store.js';
 import { userStore } from './modules/users/user.store.js';
 import { startServer } from './startServer.js';
 
@@ -25,8 +27,10 @@ try {
   ({ shutdown } = await startServer({
     config,
     logger,
-    database: { connect: connectDatabase, state: databaseState, disconnect: disconnectDatabase },
+    database: { connect: connectDatabase, state: databaseState, disconnect: disconnectDatabase, withTransaction },
     users: userStore,
+    organizations: organizationStore,
+    memberships: membershipStore,
   }));
 } catch (error) {
   logger.error('startup failed', { error: errorFields(error) });

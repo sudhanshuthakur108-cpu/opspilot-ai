@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { HttpError } from '../../lib/httpError.js';
-import { createRequireAuth, findSessionUser } from './auth.middleware.js';
+import { findSessionUser } from './auth.middleware.js';
 import { authenticateUser, registerUser } from './auth.service.js';
 import { validateLogin, validateRegistration } from './auth.validation.js';
-import { createSessions } from './session.js';
 
 // Register and login attempts allowed per client IP in each window.
 const ATTEMPT_LIMIT = 10;
@@ -14,11 +13,9 @@ function publicUser(user) {
   return { id: user.id, email: user.email, createdAt: user.createdAt };
 }
 
-// `users` is the user store (see modules/users/user.store.js); `secret` signs session tokens.
-export function createAuthRouter({ users, secret, secureCookie }) {
-  const sessions = createSessions({ secret, secureCookie });
-  const requireAuth = createRequireAuth({ sessions, users });
-
+// `users` is the user store (see modules/users/user.store.js); `sessions` and `requireAuth`
+// are shared with the other routers (see app.js).
+export function createAuthRouter({ users, sessions, requireAuth }) {
   // Counts every attempt, successful or not. The store is in memory, so counts reset on restart
   // and are per instance. Client IPs are only correct once `trust proxy` is set for the deployment.
   const limitAttempts = rateLimit({
