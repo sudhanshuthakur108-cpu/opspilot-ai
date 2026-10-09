@@ -15,3 +15,13 @@ export async function createOrganization({ name, slug }) {
   });
   return { ...organization, role: membership.role };
 }
+
+// Renames the organization; only owners and admins may (the server checks). Returns
+// { id, name, slug, createdAt }, without the caller's role, which does not change.
+export async function updateOrganization(organizationId, { name }) {
+  const { organization } = await apiRequest(`/organizations/${encodeURIComponent(organizationId)}`, {
+    method: 'PATCH',
+    body: { name },
+  });
+  return organization;
+}

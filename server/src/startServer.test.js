@@ -2,6 +2,7 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { startServer } from './startServer.js';
 import { captureLogger } from './testing/captureLogger.js';
+import { createMemoryAuditLogStore } from './testing/memoryAuditLogStore.js';
 import { createMemoryCustomerStore } from './testing/memoryCustomerStore.js';
 import { createMemoryOrderStore } from './testing/memoryOrderStore.js';
 import { createMemoryTaskStore } from './testing/memoryTaskStore.js';
@@ -53,6 +54,7 @@ function start(uri, { database = fakeDatabase(), logger = captureLogger(), ai } 
     customers: createMemoryCustomerStore(),
     orders: createMemoryOrderStore(),
     tasks: createMemoryTaskStore(),
+    auditLogs: createMemoryAuditLogStore(),
   });
 }
 
@@ -155,6 +157,25 @@ describe('startServer with a database', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ tasks: [] });
+    await shutdown('SIGTERM');
+  });
+
+  it('enables organization settings and the audit log, recording the change', async () => {
+    const { server, shutdown } = await start(DATABASE_URI);
+    const { cookie } = await signUp(server, { origin: CLIENT_ORIGIN });
+    const created = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Acme', slug: 'acme' });
+    const organizationPath = `/api/v1/organizations/${created.body.organization.id}`;
+
+    const renamed = await request(server).patch(organizationPath).set('Origin', CLIENT_ORIGIN).set('Cookie', cookie).send({ name: 'Acme Logistics' });
+    const auditLogs = await request(server).get(`${organizationPath}/audit-logs`).set('Cookie', cookie);
+
+    expect(renamed.status).toBe(200);
+    expect(auditLogs.status).toBe(200);
+    expect(auditLogs.body.auditLogs.map((entry) => entry.action)).toEqual(['organization.updated']);
     await shutdown('SIGTERM');
   });
 

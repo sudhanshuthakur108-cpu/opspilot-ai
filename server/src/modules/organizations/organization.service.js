@@ -1,4 +1,5 @@
 import { HttpError } from '../../lib/httpError.js';
+import { recordAuditEvent } from '../audit/audit.service.js';
 import { OWNER } from './roles.js';
 
 // Creates an organization with `ownerUserId` as its owner. Both writes share one transaction,
@@ -38,4 +39,36 @@ export async function listOrganizationsForUser({ organizations, memberships }, u
   const roles = new Map(userMemberships.map((membership) => [membership.organizationId, membership.role]));
   const found = await organizations.findByIds([...roles.keys()]);
   return found.map((organization) => ({ ...organization, role: roles.get(organization.id) }));
+}
+
+// Renames the organization and records an `organization.updated` audit event in the same
+// transaction, so a rename is never left out of the audit log. `actorUserId` must be the
+// authenticated user's ID. A name that does not change writes nothing.
+export async function renameOrganization(
+  { organizations, auditLogs, withTransaction },
+  { organizationId, name, actorUserId },
+) {
+  return withTransaction(async (session) => {
+    const current = await organizations.findById(organizationId, { session });
+    if (!current) {
+      throw new HttpError(404, 'NOT_FOUND', 'Organization not found');
+    }
+    if (current.name === name) {
+      return current;
+    }
+
+    const organization = await organizations.updateName(organizationId, name, { session });
+    await recordAuditEvent(
+      auditLogs,
+      {
+        organizationId,
+        actor: { type: 'user', userId: actorUserId },
+        action: 'organization.updated',
+        resourceId: organizationId,
+        details: { previousName: current.name, name: organization.name },
+      },
+      { session },
+    );
+    return organization;
+  });
 }

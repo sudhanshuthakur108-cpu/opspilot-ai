@@ -2,6 +2,7 @@ import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Icon } from '../../components/Icon.jsx';
 import { Link } from '../../components/Link.jsx';
+import { canManageWorkspace } from '../organizations/roles.js';
 import './DashboardOverview.css';
 
 // Cards for the pages that exist. They link there rather than show counts.
@@ -91,9 +92,19 @@ export function DashboardOverview({ organization, justCreated }) {
         </h2>
         <EmptyState
           icon="activity"
-          title="No activity yet"
-          description="Changes your team makes in this workspace will appear here."
-        />
+          title="Activity is kept in the audit log"
+          description={
+            canManageWorkspace(organization.role)
+              ? 'Important workspace changes, such as a new workspace name, are recorded there with who made them and when.'
+              : 'Important workspace changes are recorded with who made them and when. Owners and admins can review them.'
+          }
+        >
+          {canManageWorkspace(organization.role) && (
+            <Link className="button button--secondary button--small" href="/audit-logs">
+              View audit log
+            </Link>
+          )}
+        </EmptyState>
       </section>
     </div>
   );

@@ -1,5 +1,4 @@
-// Sidebar entries, grouped into sections. An entry without an `href` is shown as upcoming and
-// gets one once its page is built (see PAGES in Dashboard.jsx).
+// Sidebar entries, grouped into sections. Each `href` has a page in PAGES in Dashboard.jsx.
 export const NAV_SECTIONS = [
   {
     id: 'home',
@@ -19,15 +18,15 @@ export const NAV_SECTIONS = [
     title: 'AI',
     items: [
       { id: 'assistant', label: 'AI Assistant', icon: 'assistant', href: '/assistant' },
-      { id: 'approvals', label: 'Approvals', icon: 'approvals' },
+      { id: 'approvals', label: 'Approvals', icon: 'approvals', href: '/approvals' },
     ],
   },
   {
     id: 'workspace',
     title: 'Workspace',
     items: [
-      { id: 'audit-logs', label: 'Audit Logs', icon: 'audit' },
-      { id: 'settings', label: 'Settings', icon: 'settings' },
+      { id: 'audit-logs', label: 'Audit Logs', icon: 'audit', href: '/audit-logs' },
+      { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
     ],
   },
 ];

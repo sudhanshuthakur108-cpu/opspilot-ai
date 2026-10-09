@@ -1,0 +1,57 @@
+.approvals-how__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.approvals-how__current {
+  max-width: 70ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.approvals-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: approval-step;
+}
+
+.approvals-steps__item {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  counter-increment: approval-step;
+}
+
+.approvals-steps__item::before {
+  content: counter(approval-step);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: 50%;
+}
+
+.approvals-steps__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.approvals-steps__text {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

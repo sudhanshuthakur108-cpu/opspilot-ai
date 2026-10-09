@@ -29,6 +29,10 @@ export function createMemoryUserStore() {
       return record ? withoutHash(record) : null;
     },
 
+    async findByIds(ids) {
+      return ids.map((id) => records.get(id)).filter(Boolean).map(withoutHash);
+    },
+
     async incrementTokenVersion(id) {
       records.get(id).tokenVersion += 1;
     },

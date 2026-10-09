@@ -9,6 +9,7 @@ import { requestLogger } from './middleware/requestLogger.js';
 import { requireSameOrigin } from './middleware/sameOrigin.js';
 import { createAiRouter } from './modules/ai/ai.routes.js';
 import { developmentProvider } from './modules/ai/development.provider.js';
+import { createAuditLogRouter } from './modules/audit/audit.routes.js';
 import { createRequireAuth } from './modules/auth/auth.middleware.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createSessions } from './modules/auth/session.js';
@@ -27,10 +28,11 @@ function authUnavailable(req, res, next) {
 }
 
 // `auth` ({ users, secret, secureCookie }), `organizationStores` ({ organizations, memberships,
-// withTransaction }), and the `customers`, `orders` and `tasks` stores are omitted when the app
-// runs without a database. Customer, order, task and AI routes need the organization stores for
-// their membership check; order routes also need the customer store, task routes need the customer
-// and order stores, and AI routes need all three record stores for their tools.
+// withTransaction }), and the `customers`, `orders`, `tasks` and `auditLogs` stores are omitted
+// when the app runs without a database. Customer, order, task, audit log and AI routes need the
+// organization stores for their membership check; order routes also need the customer store, task
+// routes need the customer and order stores, and AI routes need all three record stores for their
+// tools. Changing an organization's settings needs the audit log store, as every change is audited.
 // `aiProvider` answers AI Assistant messages (see modules/ai/ai.provider.js); it defaults to the
 // development provider, which connects to no model.
 export function createApp({
@@ -42,6 +44,7 @@ export function createApp({
   customers,
   orders,
   tasks,
+  auditLogs,
   aiProvider = developmentProvider,
 } = {}) {
   const app = express();
@@ -61,9 +64,15 @@ export function createApp({
 
     app.use('/api/v1/auth', createAuthRouter({ users: auth.users, sessions, requireAuth }));
     if (organizationStores) {
-      app.use('/api/v1/organizations', createOrganizationRouter({ requireAuth, ...organizationStores }));
-
       const requireMembership = createRequireMembership({ requireAuth, memberships: organizationStores.memberships });
+      app.use('/api/v1/organizations', createOrganizationRouter({ requireAuth, requireMembership, ...organizationStores, auditLogs }));
+
+      if (auditLogs) {
+        app.use(
+          '/api/v1/organizations/:organizationId/audit-logs',
+          createAuditLogRouter({ requireMembership, auditLogs, users: auth.users }),
+        );
+      }
       if (customers) {
         app.use('/api/v1/organizations/:organizationId/customers', createCustomerRouter({ requireMembership, customers }));
       }

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { isDuplicateKeyError } from '../../lib/database.js';
 import { User } from './user.model.js';
 
@@ -32,6 +33,14 @@ export const userStore = {
   async findById(id) {
     const doc = await User.findById(id).lean();
     return doc && toUser(doc);
+  },
+
+  // For showing who did something, such as the actor of an audit log entry.
+  async findByIds(ids) {
+    // sanitizeFilter would neutralize `$in`; it is marked trusted because callers pass IDs read
+    // from stored records, never from the request.
+    const docs = await User.find({ _id: mongoose.trusted({ $in: ids }) }).lean();
+    return docs.map(toUser);
   },
 
   async incrementTokenVersion(id) {

@@ -27,6 +27,13 @@ export function createMemoryOrganizationStores() {
       return record ? { ...record } : null;
     },
 
+    async updateName(id, name) {
+      const record = organizationRecords.get(id);
+      if (!record) return null;
+      record.name = name;
+      return { ...record };
+    },
+
     async findByIds(ids) {
       return ids
         .map((id) => organizationRecords.get(id))

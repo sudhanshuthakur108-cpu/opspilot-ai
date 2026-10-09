@@ -25,8 +25,14 @@ export const organizationStore = {
     }
   },
 
-  async findById(id) {
-    const doc = await Organization.findById(id).lean();
+  async findById(id, { session } = {}) {
+    const doc = await Organization.findById(id, null, { session }).lean();
+    return doc && toOrganization(doc);
+  },
+
+  // Returns the renamed organization, or null when there is none with this ID.
+  async updateName(id, name, { session } = {}) {
+    const doc = await Organization.findByIdAndUpdate(id, { $set: { name } }, { session, returnDocument: 'after', runValidators: true }).lean();
     return doc && toOrganization(doc);
   },
 

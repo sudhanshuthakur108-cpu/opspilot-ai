@@ -107,7 +107,7 @@ describe('Customers navigation', () => {
   });
 
   it('shows the dashboard for an address that is not a page', async () => {
-    window.history.replaceState(null, '', '/settings');
+    window.history.replaceState(null, '', '/reports');
     mockServer();
 
     render(<App />);

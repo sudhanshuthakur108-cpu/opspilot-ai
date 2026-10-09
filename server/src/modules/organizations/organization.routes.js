@@ -1,9 +1,13 @@
 import { Router } from 'express';
-import { createOrganizationWithOwner, listOrganizationsForUser } from './organization.service.js';
-import { validateNewOrganization } from './organization.validation.js';
+import { requireOrganizationRole } from './organization.middleware.js';
+import { createOrganizationWithOwner, listOrganizationsForUser, renameOrganization } from './organization.service.js';
+import { validateNewOrganization, validateOrganizationChanges } from './organization.validation.js';
+import { ADMIN, OWNER } from './roles.js';
 
 // `organizations` and `memberships` are the stores; `withTransaction` comes from lib/database.js.
-export function createOrganizationRouter({ requireAuth, organizations, memberships, withTransaction }) {
+// `requireMembership` comes from organization.middleware.js. Changing an organization needs the
+// `auditLogs` store, since every change is audited; without it that route is not added.
+export function createOrganizationRouter({ requireAuth, requireMembership, organizations, memberships, withTransaction, auditLogs }) {
   const router = Router();
 
   // GET / → 200 { organizations: [{ id, name, slug, role, createdAt }] }, newest first.
@@ -23,6 +27,24 @@ export function createOrganizationRouter({ requireAuth, organizations, membershi
 
     res.status(201).json({ organization, membership });
   });
+
+  if (auditLogs) {
+    // PATCH /:organizationId { name } → 200 { organization: { id, name, slug, createdAt } }.
+    // Owners and admins only. The organization is the verified membership's, and the audit
+    // event names the signed-in user as the actor.
+    router.patch('/:organizationId', requireMembership, requireOrganizationRole(OWNER, ADMIN), async (req, res) => {
+      const organization = await renameOrganization(
+        { organizations, auditLogs, withTransaction },
+        {
+          organizationId: req.membership.organizationId,
+          name: validateOrganizationChanges(req.body).name,
+          actorUserId: req.membership.userId,
+        },
+      );
+
+      res.json({ organization });
+    });
+  }
 
   return router;
 }

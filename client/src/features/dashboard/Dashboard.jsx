@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { AppHeader } from '../../components/AppHeader.jsx';
 import { Icon } from '../../components/Icon.jsx';
 import { navigate, usePathname } from '../../routing.js';
+import { ApprovalsPage } from '../approvals/ApprovalsPage.jsx';
 import { AssistantPage } from '../assistant/AssistantPage.jsx';
+import { AuditLogsPage } from '../audit/AuditLogsPage.jsx';
 import { CustomersPage } from '../customers/CustomersPage.jsx';
 import { OrdersPage } from '../orders/OrdersPage.jsx';
+import { SettingsPage } from '../settings/SettingsPage.jsx';
 import { TasksPage } from '../tasks/TasksPage.jsx';
 import { DashboardOverview } from './DashboardOverview.jsx';
 import { Sidebar } from './Sidebar.jsx';
@@ -21,10 +24,14 @@ const PAGES = {
   '/orders': { id: 'orders', title: 'Orders' },
   '/tasks': { id: 'tasks', title: 'Tasks' },
   '/assistant': { id: 'assistant', title: 'AI Assistant' },
+  '/approvals': { id: 'approvals', title: 'Approvals' },
+  '/audit-logs': { id: 'audit-logs', title: 'Audit Logs' },
+  '/settings': { id: 'settings', title: 'Settings' },
 };
 
 // The signed-in app frame for one organization: sidebar, header and the current page.
-export function Dashboard({ organization, justCreated }) {
+// `onOrganizationUpdated` receives the organization after its settings change.
+export function Dashboard({ organization, justCreated, onOrganizationUpdated }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
   const pathname = usePathname();
@@ -98,6 +105,9 @@ export function Dashboard({ organization, justCreated }) {
           {page?.id === 'orders' && <OrdersPage organization={organization} />}
           {page?.id === 'tasks' && <TasksPage organization={organization} />}
           {page?.id === 'assistant' && <AssistantPage organization={organization} />}
+          {page?.id === 'approvals' && <ApprovalsPage organization={organization} />}
+          {page?.id === 'audit-logs' && <AuditLogsPage organization={organization} />}
+          {page?.id === 'settings' && <SettingsPage organization={organization} onUpdated={onOrganizationUpdated} />}
           {(!page || page.id === 'dashboard') && (
             <DashboardOverview organization={organization} justCreated={justCreated} />
           )}

@@ -101,7 +101,7 @@ opspilot-ai/
 
 ## 4. Planned API Route Groups
 
-All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, `GET`, `POST` and `PATCH /organizations/:organizationId/tasks`, and `POST /organizations/:organizationId/ai/assistant` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
+All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, `GET`, `POST` and `PATCH /organizations/:organizationId/tasks`, `POST /organizations/:organizationId/ai/assistant`, `PATCH /organizations/:organizationId` and `GET /organizations/:organizationId/audit-logs` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
 
 **Common conventions (planned):**
 
@@ -114,7 +114,7 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 | --- | --- | --- |
 | **Health** | `GET /health` (liveness; **implemented**)<br>`GET /ready` (readiness; **implemented**: reports the MongoDB connection state when a database is configured, with 503 when it is not connected) | Public |
 | **Auth** (**implemented**) | `POST /auth/register`<br>`POST /auth/login`<br>`POST /auth/logout`<br>`GET /auth/me` | Public, except `me`. `logout` works with or without a valid session. All return 503 when no database is configured. |
-| **Organizations** | `POST /organizations` (**implemented**)<br>`GET /organizations` (my organizations; **implemented**)<br>`GET /organizations/:organizationId`<br>`PATCH /organizations/:organizationId`<br>`GET /organizations/:organizationId/members` | Authenticated. `POST` makes the caller the owner; `GET /organizations` lists only the caller's organizations. The other routes require membership, and changes need an admin role. |
+| **Organizations** | `POST /organizations` (**implemented**)<br>`GET /organizations` (my organizations; **implemented**)<br>`GET /organizations/:organizationId`<br>`PATCH /organizations/:organizationId` (**implemented**: name only)<br>`GET /organizations/:organizationId/members` | Authenticated. `POST` makes the caller the owner; `GET /organizations` lists only the caller's organizations. The other routes require membership, and changes need the owner or admin role. |
 
 **`POST /organizations` (implemented):**
 
@@ -130,6 +130,29 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 - Order: newest first by the organization's `createdAt`, with ties broken by ID (newer IDs first).
 - The lookup goes through memberships: the user's memberships (by the `userId` index), then only those organizations (by `_id`). No organization outside the user's memberships is ever loaded.
 - No pagination yet. A user is expected to belong to few organizations.
+
+**`PATCH /organizations/:organizationId` (implemented):**
+
+- Runs the membership middleware, then `requireOrganizationRole('owner', 'admin')`: 401 without a session, 400 for a malformed organization ID, 404 for a non-member, 403 for a member. The organization is always `req.membership.organizationId`; an `organizationId` in the body, query or headers is ignored.
+- Body: `{ "name": string }`, validated with the same rule as `POST /organizations` (trimmed, 1–100 characters; 400 `VALIDATION_FAILED` otherwise). Every other field, including `slug`, owner, role, actor and ID fields, is ignored, so none of them can be changed (no mass assignment). The slug is not editable because no rules for changing an organization's address have been decided.
+- `200 { organization: { id, name, slug, createdAt } }`.
+- In one transaction (`renameOrganization` in `organization.service.js`): load the organization, update the name, and record an `organization.updated` audit event with the authenticated user as the actor and `{ previousName, name }` as details. If the audit write fails, the rename is rolled back, so no rename goes unaudited. A name that does not change writes nothing and records no event.
+- The route exists only when the app is given the audit log store (`createApp({ auditLogs })`), which `startServer` always passes when a database is configured.
+- Deleting an organization is not implemented.
+
+**`GET /organizations/:organizationId/audit-logs` (implemented):**
+
+- Membership middleware, then `requireOrganizationRole('owner', 'admin')` (members get 403). The organization is always `req.membership.organizationId`.
+- Query: `page` (1–1000, default 1) and `limit` (1–100, default 25), as whole numbers; anything else gets 400 `VALIDATION_FAILED`. Pages are fetched with `skip` and `limit + 1`, so every query is bounded, and very deep pages are refused rather than scanned.
+- `200 { auditLogs: [{ id, actorType, actorEmail, action, resourceType, resourceId, details, createdAt }], page, limit, hasMore }` with `Cache-Control: no-store`, newest first by `createdAt` then ID. `actorEmail` is loaded from the users store for `user` actors (`null` for `ai`, `system` and deleted users); internal user and organization IDs are not returned.
+- Read-only: there is no route that creates, edits or deletes entries.
+
+**Audit log architecture (implemented, `modules/audit/`):**
+
+- **Explicit events, not request logging.** A business action worth auditing calls `recordAuditEvent(auditLogs, { organizationId, actor, action, resourceId, details }, { session })`. Passing the action's transaction `session` writes the entry atomically with the change. Requests, including GETs and AI messages, are not logged automatically.
+- **Controlled vocabulary** (`audit.events.js`): actor types are `user`, `ai` and `system`. Each action names its resource type and the only detail keys it may store; currently there is just `organization.updated` (resource `organization`; details `previousName`, `name`). Unknown actions, unknown actor types, a `user` actor without a user ID, a non-user actor with one, and non-text or over-200-character details throw, which aborts the surrounding transaction. Detail keys outside the allowlist are dropped, so passwords, tokens, API keys, authorization headers, prompts, provider payloads and request bodies cannot be stored even if a caller passes them.
+- **Actor identity** comes from the server: for user actions, the route passes `req.membership.userId`, which comes from the verified session. A client cannot claim `actorType: "ai"` or another user; such body fields are ignored.
+- **Storage:** `AuditLog` documents hold only `organizationId`, `actorType`, `actorUserId`, `action`, `resourceType`, `resourceId` (ObjectIds for IDs), `details` (a map of strings) and `createdAt`, with an index on `{ organizationId: 1, createdAt: -1, _id: -1 }`. The store has no update or delete methods. Tests use an in-memory store with the same contract (`testing/memoryAuditLogStore.js`).
 
 **`POST` and `GET /organizations/:organizationId/customers` (implemented):**
 
@@ -197,8 +220,8 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 | **Orders** | `GET`, `POST /organizations/:organizationId/orders` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/orders/:id` | Org member (any role) |
 | **Tasks** | `GET`, `POST /organizations/:organizationId/tasks` (**implemented**)<br>`PATCH /organizations/:organizationId/tasks/:id` (**implemented**: status, priority and due date only)<br>`GET`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
 | **AI tools** | `POST /organizations/:organizationId/ai/assistant` (**implemented**, see above)<br>`POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited (planned) |
-| **Approvals** | `GET /organizations/:organizationId/approvals`<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve`<br>`POST /organizations/:organizationId/approvals/:id/reject` | Org member; deciding needs a permitted role |
-| **Audit logs** | `GET /organizations/:organizationId/audit-logs` | Org admin; read-only (there are no write endpoints) |
+| **Approvals** | `GET /organizations/:organizationId/approvals`<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve`<br>`POST /organizations/:organizationId/approvals/:id/reject` | Org member; deciding needs a permitted role. Not built: the client has an Approvals page that shows a "No approvals waiting" empty state, explains the planned flow and requests no data. |
+| **Audit logs** | `GET /organizations/:organizationId/audit-logs` (**implemented**, see above) | Owner or admin; read-only (there are no write endpoints) |
 
 **Relationships between resources:** an order references a customer (**implemented**: checked on create, see above; orders cannot be updated yet). A task may optionally reference a customer, an order or both (**implemented**: checked on create, and the links cannot be changed by an update). Every reference must point to a record in the **same organization**, and the server checks this on create and update.
 
@@ -244,7 +267,9 @@ sequenceDiagram
     end
 ```
 
-**Audit log entries (planned)** record who did what: the organization, the acting user, the action, the target type and ID, a timestamp, and minimal metadata. They are written by the server for data changes, approval decisions and AI tool use. They never contain passwords, tokens or secrets.
+**Audit log entries** record who did what: the organization, the actor, the action, the target type and ID, a timestamp, and minimal allowlisted details (see the audit log architecture above). They are **implemented** for organization renames only. Entries for other data changes, approval decisions (actor `user`) and AI proposals (actor `ai`) are planned; each will be a new action in `audit.events.js`, recorded explicitly by the code that causes it. Entries never contain passwords, tokens or secrets.
+
+**Future AI mutation workflow (planned, not implemented):** the AI Assistant stays read-only until this exists. A model tool that would change data will be marked as not read-only, so `runTool` refuses to run it directly. Instead, the server validates the proposal, stores it as a pending approval and records an audit event with actor `ai`. The Approvals page will then list pending approvals from the approvals API in place of its current empty state. Approving re-checks the approver's role and the target, applies only the stored proposal and records the decision with actor `user`, all in one transaction.
 
 ## 5. Authentication and Organization Isolation
 
@@ -280,6 +305,7 @@ sequenceDiagram
   - Responses: no valid session gets **401** `UNAUTHENTICATED` (checked before anything else). A malformed ID gets **400** `VALIDATION_FAILED`, before any lookup. A non-member gets **404** `NOT_FOUND` ("Organization not found"), identical to an organization that does not exist.
   - `requireOrganizationRole(...roles)` runs after it: a member without one of the roles gets **403** `FORBIDDEN`. An empty or unknown role list throws when the route is defined, and using it without the membership middleware fails closed with a 500.
 - Services take `organizationId` from that request context, never from the request body, and every database query on organization data includes it.
+- Role checks so far: any member may use customers, orders, tasks and the AI Assistant; only `owner` and `admin` may rename the organization (`PATCH /organizations/:organizationId`) and read its audit log.
 - Validation schemas strip unknown fields, so a client cannot set `organizationId`, `role` or other server-controlled fields (mass assignment).
 - Requesting another organization's record returns **404**, not 403, so the response does not reveal that the record exists.
 - Each organization-owned module must include isolation tests showing that a user in organization A cannot read, update or delete organization B's data.
@@ -384,11 +410,11 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
 | **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; the customer routes use the middleware and have isolation tests, and the other organization routes are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
-| **6. Audit log service** | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
+| **6. Audit log service** (**In progress**: the model, the explicit `recordAuditEvent` helper, the owner/admin-only read endpoint and the client Audit Logs page are implemented and tested, including against a temporary MongoDB replica set; only organization renames record events so far) | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
 | **7. Customers** (**In progress**: create and list are implemented with validation and isolation tests, including against a temporary MongoDB replica set, and the client has a list page and an add form with component tests; get, update and delete are not built) | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
 | **8. Orders and tasks** (**In progress**: order create and list are implemented with validation, same-organization customer checks and isolation tests, including against a temporary MongoDB replica set, and the client has an Orders page and a new-order form with component tests; task create, list and status/priority/due-date updates are implemented the same way, with same-organization customer and order checks, and the client has a Tasks page with a new-task form and a status control per row; order get, update and delete, and task get, full edit and delete, are not built) | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
 | **9. AI layer (no model)** (**In progress**: the provider boundary, the development provider, the assistant endpoint with validation and isolation tests, the read-only tool allowlist, and a client page with component tests are implemented; summarize and suggest endpoints and rate limits are not built) | Provider interface, development provider, summarize and suggest endpoints, rate limits | Endpoint tests pass with the deterministic development provider, and a component test shows AI output containing HTML is displayed as plain text |
-| **10. Approvals** | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
+| **10. Approvals** (**Not started** on the server; the client has an Approvals page with a truthful empty state) | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
 | **11. OpenAI provider** (**In progress**: implemented with read-only tool calling, limits, timeouts and error mapping, and tested with a stand-in SDK client; the manual check with a real key is pending) | `openai` provider behind the same interface, with timeouts and error mapping | Tests pass with mocked HTTP; manual check with a real key in development only |
 | **12. Hardening** | CI, basic accessibility check of the main pages (keyboard navigation, form labels), README update reflecting only verified features | CI runs lint and tests on every push and is green, the accessibility checklist is completed, and the README lists only features verified in the deployed app |
 
@@ -398,7 +424,8 @@ These are intentionally left undecided rather than assumed:
 
 - Any customer, order or task fields beyond the current ones (for example order line items, storing amounts in minor units, or task assignees).
 - Hard delete or archive (soft delete) for each module.
-- The final roles and permissions, including whether users can approve their own requests.
+- The final roles and permissions, including whether users can approve their own requests (so far only settings changes and audit log access are restricted, to owners and admins).
+- Rules for changing an organization's slug, transferring ownership and deleting an organization.
 - Which kinds of AI-proposed data change need approval, beyond the planned example.
 - Session lifetime, and whether logout should sign out every device (planned default) or only the current one (needs a server-side session store).
 - Whether a custom domain is needed (only if the Vercel rewrite fails verification).

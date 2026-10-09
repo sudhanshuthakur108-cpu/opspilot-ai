@@ -1,0 +1,47 @@
+.records-table .audit-table__time {
+  white-space: nowrap;
+}
+
+/* Emails wrap only when they do not fit, never mid-word just to narrow the column. */
+.records-table .audit-table__actor {
+  overflow-wrap: break-word;
+}
+
+.records-table .audit-table__resource {
+  white-space: nowrap;
+}
+
+.records-table .audit-table__action {
+  font-weight: 600;
+}
+
+.audit-table__details {
+  min-width: 14rem;
+}
+
+/* The label carries the meaning; the color only reinforces it. */
+.audit-actor {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.audit-actor--ai {
+  color: var(--color-primary);
+}
+
+.audit-actor--system {
+  color: var(--color-text-muted);
+}
+
+/* Sits under the edge-to-edge table, inside the panel. */
+.audit-more {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.audit-more .alert {
+  justify-self: stretch;
+}

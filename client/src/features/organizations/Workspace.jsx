@@ -67,11 +67,24 @@ export function Workspace() {
     setCreatedOrganizationId(organization.id);
   }
 
+  // A renamed organization keeps the caller's role, which the update response does not include.
+  function handleUpdated(updated) {
+    setOrganizations((current) =>
+      current.map((organization) => (organization.id === updated.id ? { ...organization, ...updated } : organization)),
+    );
+  }
+
   if (loadError) return <LoadFailed message={loadError} onRetry={retry} />;
   if (!organizations) return <LoadingScreen label="Loading your workspaces…" />;
   if (organizations.length === 0) return <OnboardingScreen onCreated={handleCreated} />;
 
   // There is no organization switcher yet, so a member of several organizations sees the first.
   const [organization] = organizations;
-  return <Dashboard organization={organization} justCreated={organization.id === createdOrganizationId} />;
+  return (
+    <Dashboard
+      organization={organization}
+      justCreated={organization.id === createdOrganizationId}
+      onOrganizationUpdated={handleUpdated}
+    />
+  );
 }

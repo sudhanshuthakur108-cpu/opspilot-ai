@@ -3,28 +3,11 @@ import { useAuth } from '../../auth/authContext.js';
 import { Brand } from '../../components/Brand.jsx';
 import { Icon } from '../../components/Icon.jsx';
 import { Link } from '../../components/Link.jsx';
+import { roleLabel } from '../organizations/roles.js';
 import { NAV_SECTIONS } from './navigation.js';
 import './Sidebar.css';
 
-const ROLE_LABELS = { owner: 'Owner', admin: 'Admin', member: 'Member' };
-
 function NavItem({ item, current, onNavigate }) {
-  const content = (
-    <>
-      <Icon name={item.icon} />
-      <span className="sidebar__label">{item.label}</span>
-    </>
-  );
-
-  if (!item.href) {
-    return (
-      <span className="sidebar__link sidebar__link--upcoming" title={`${item.label} (coming soon)`}>
-        {content}
-        <span className="sidebar__soon">Soon</span>
-      </span>
-    );
-  }
-
   return (
     <Link
       className="sidebar__link"
@@ -33,7 +16,8 @@ function NavItem({ item, current, onNavigate }) {
       aria-current={current ? 'page' : undefined}
       onClick={onNavigate}
     >
-      {content}
+      <Icon name={item.icon} />
+      <span className="sidebar__label">{item.label}</span>
     </Link>
   );
 }
@@ -69,7 +53,7 @@ export function Sidebar({ id, organization, currentPage, open, onClose }) {
         </span>
         <span className="sidebar__workspace-details">
           <span className="sidebar__workspace-name">{organization.name}</span>
-          <span className="sidebar__workspace-role">{ROLE_LABELS[organization.role] ?? organization.role}</span>
+          <span className="sidebar__workspace-role">{roleLabel(organization.role)}</span>
         </span>
       </div>
 

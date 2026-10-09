@@ -149,31 +149,12 @@ a.sidebar__link[aria-current='page'] {
   border-radius: 0 3px 3px 0;
 }
 
-.sidebar__link--upcoming {
-  cursor: default;
-}
-
-.sidebar__link--upcoming .icon {
-  color: var(--color-text-subtle);
-}
-
 .sidebar__label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.sidebar__soon {
-  flex-shrink: 0;
-  padding: 0 0.4375rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1.25rem;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
 }
 
 .sidebar__account {
@@ -197,8 +178,7 @@ a.sidebar__link[aria-current='page'] {
   .sidebar .brand__name,
   .sidebar__workspace-details,
   .sidebar__section-title,
-  .sidebar__label,
-  .sidebar__soon {
+  .sidebar__label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -229,10 +209,6 @@ a.sidebar__link[aria-current='page'] {
 
   .sidebar__link[aria-current='page']::before {
     left: calc(-1 * var(--space-4));
-  }
-
-  .sidebar__link--upcoming {
-    opacity: 0.75;
   }
 }
 

@@ -6,7 +6,6 @@ import { json, mockApi } from '../../testing/mockApi.js';
 const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
 const ACME = { id: 'b'.repeat(24), name: 'Acme Logistics', slug: 'acme-logistics', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 const GLOBEX = { id: 'c'.repeat(24), name: 'Globex', slug: 'globex', role: 'member', createdAt: '2026-10-01T09:00:00.000Z' };
-const UPCOMING_SECTIONS = ['Approvals', 'Audit Logs', 'Settings'];
 
 async function renderDashboard({ organizations = [ACME], ...handlers } = {}) {
   const fetchMock = mockApi({
@@ -63,22 +62,21 @@ describe('dashboard', () => {
     expect(fireEvent.click(link)).toBe(false);
   });
 
-  it('lists the upcoming sections as not yet available, without linking anywhere', async () => {
+  it('links every section, with none marked as coming soon', async () => {
     await renderDashboard();
 
-    expect(within(navigation()).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Dashboard',
-      'Customers',
-      'Orders',
-      'Tasks',
-      'AI Assistant',
+    expect(within(navigation()).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Dashboard', '/'],
+      ['Customers', '/customers'],
+      ['Orders', '/orders'],
+      ['Tasks', '/tasks'],
+      ['AI Assistant', '/assistant'],
+      ['Approvals', '/approvals'],
+      ['Audit Logs', '/audit-logs'],
+      ['Settings', '/settings'],
     ]);
+    expect(within(navigation()).queryByText('Soon')).toBeNull();
     expect(within(navigation()).queryAllByRole('button')).toHaveLength(0);
-    for (const label of UPCOMING_SECTIONS) {
-      const item = within(navigation()).getByText(label).closest('li');
-      expect(item.textContent).toBe(`${label}Soon`);
-      expect(item.querySelector('a, button, [tabindex]')).toBeNull();
-    }
   });
 
   it.each([
@@ -93,13 +91,21 @@ describe('dashboard', () => {
     expect(within(card).getByRole('link', { name: linkName }).getAttribute('href')).toBe(href);
   });
 
-  it('shows an empty state for recent activity instead of data', async () => {
+  it('points recent activity to the audit log instead of showing data', async () => {
     await renderDashboard();
-    const main = within(screen.getByRole('main'));
+    const activity = within(screen.getByRole('region', { name: 'Recent activity' }));
 
-    const activity = main.getByRole('region', { name: 'Recent activity' });
-    expect(within(activity).getByText('No activity yet')).toBeTruthy();
-    expect(within(activity).getByText('Changes your team makes in this workspace will appear here.')).toBeTruthy();
+    expect(activity.getByText('Activity is kept in the audit log')).toBeTruthy();
+    expect(activity.queryByText('No activity yet')).toBeNull();
+    expect(activity.getByRole('link', { name: 'View audit log' }).getAttribute('href')).toBe('/audit-logs');
+  });
+
+  it('does not offer the audit log to a member, who cannot view it', async () => {
+    await renderDashboard({ organizations: [GLOBEX] });
+    const activity = within(screen.getByRole('region', { name: 'Recent activity' }));
+
+    expect(activity.getByText(/Owners and admins can review them/)).toBeTruthy();
+    expect(activity.queryByRole('link')).toBeNull();
   });
 
   it('links to the AI Assistant, marked as read-only and without claiming it can change anything', async () => {
