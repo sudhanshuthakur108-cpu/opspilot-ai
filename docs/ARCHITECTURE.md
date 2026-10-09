@@ -97,11 +97,11 @@ opspilot-ai/
 | **Client** | UI, routing, form usability checks, calling the API, rendering AI output as plain text | Hold secrets; be the only place permissions are enforced (it may hide controls, but the server decides); talk to the database or AI provider directly |
 | **Server** | Authentication, authorization, input validation, business logic, organization isolation, AI orchestration, audit logging, error mapping | Trust client-supplied `organizationId`, `userId` or `role`; return stack traces or internal error details |
 | **Database** | Persistence, unique constraints, indexes | Be reachable by anything other than the server; hold business logic |
-| **AI provider** | Turn a prepared input into text output; ask the server to run allowlisted read-only tools by name | Access the database or stores directly; choose the organization; make authorization decisions; write data; be trusted (its output and tool input are validated like user input) |
+| **AI provider** | Turn a prepared input into text output; ask the server to run allowlisted read-only tools by name; propose a change as structured data, which the server validates and saves for a person to approve | Access the database or stores directly; choose the organization; make authorization decisions; write data or run a proposed change; be trusted (its output and tool input are validated like user input) |
 
 ## 4. Planned API Route Groups
 
-All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, `GET`, `POST` and `PATCH /organizations/:organizationId/tasks`, `POST /organizations/:organizationId/ai/assistant`, `PATCH /organizations/:organizationId` and `GET /organizations/:organizationId/audit-logs` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
+All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, `GET`, `POST` and `PATCH /organizations/:organizationId/tasks`, `POST /organizations/:organizationId/ai/assistant`, `PATCH /organizations/:organizationId`, `GET /organizations/:organizationId/audit-logs`, `GET /organizations/:organizationId/approvals` and `POST /organizations/:organizationId/approvals/:approvalId/approve` and `/reject` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
 
 **Common conventions (planned):**
 
@@ -150,7 +150,7 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 **Audit log architecture (implemented, `modules/audit/`):**
 
 - **Explicit events, not request logging.** A business action worth auditing calls `recordAuditEvent(auditLogs, { organizationId, actor, action, resourceId, details }, { session })`. Passing the action's transaction `session` writes the entry atomically with the change. Requests, including GETs and AI messages, are not logged automatically.
-- **Controlled vocabulary** (`audit.events.js`): actor types are `user`, `ai` and `system`. Each action names its resource type and the only detail keys it may store; currently there is just `organization.updated` (resource `organization`; details `previousName`, `name`). Unknown actions, unknown actor types, a `user` actor without a user ID, a non-user actor with one, and non-text or over-200-character details throw, which aborts the surrounding transaction. Detail keys outside the allowlist are dropped, so passwords, tokens, API keys, authorization headers, prompts, provider payloads and request bodies cannot be stored even if a caller passes them.
+- **Controlled vocabulary** (`audit.events.js`): actor types are `user`, `ai` and `system`. Each action names its resource type and the only detail keys it may store; currently `organization.updated` (resource `organization`; details `previousName`, `name`) and the approval lifecycle, all with resource `approval`: `approval.proposed` (details `action`, `summary`), `approval.approved` (`action`), `approval.rejected` (`action`, `reason`), `approval.executed` (`action`, `resultType`, `resultId`) and `approval.execution_failed` (`action`, `failureCode`). Unknown actions, unknown actor types, a `user` actor without a user ID, a non-user actor with one, and non-text or over-200-character details throw, which aborts the surrounding transaction. Detail keys outside the allowlist are dropped, so passwords, tokens, API keys, authorization headers, prompts, provider payloads and request bodies cannot be stored even if a caller passes them.
 - **Actor identity** comes from the server: for user actions, the route passes `req.membership.userId`, which comes from the verified session. A client cannot claim `actorType: "ai"` or another user; such body fields are ignored.
 - **Storage:** `AuditLog` documents hold only `organizationId`, `actorType`, `actorUserId`, `action`, `resourceType`, `resourceId` (ObjectIds for IDs), `details` (a map of strings) and `createdAt`, with an index on `{ organizationId: 1, createdAt: -1, _id: -1 }`. The store has no update or delete methods. Tests use an in-memory store with the same contract (`testing/memoryAuditLogStore.js`).
 
@@ -198,7 +198,7 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 - `200 { reply: { status, text, provider, toolCalls, suggestedActions, requiresApproval, availableTools, requestId } }` with `Cache-Control: no-store`.
   - `status` is `not_configured` (no model, or no API key; `text` is `null`) or `completed` (`text` is the model's answer). `provider` is `development` or `openai`; the model name is not returned.
   - `toolCalls` lists the tools that ran (`{ name, readOnly }`), and `availableTools` the allowlist (`{ name, description, readOnly }`).
-  - `suggestedActions` is always `[]` and `requiresApproval` always `false`: there is no way yet to propose a change. Both are there for the approval flow below.
+  - `suggestedActions` lists the proposals saved as pending approvals for this message (`{ approvalId, action, status, summary, parameters }`), and `requiresApproval` is `true` when there is at least one; otherwise they are `[]` and `false`. `toolCalls` marks a proposal as `readOnly: false`. See the approval flow below.
 - **Provider boundary** (`modules/ai/`): the route calls `askAssistant` in `ai.service.js`, which calls `provider.respond({ message, tools, runTool })`.
   - `tools` are plain tool definitions (name, description, read-only flag, JSON Schema for the input), never the functions that run them.
   - `runTool(name, input)` is a function the service has already bound to the membership's organization, so a provider can neither see nor choose the organization.
@@ -214,62 +214,64 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
   - Each tool has a name, description, input schema, input check and run function. They run through the same organization-scoped stores and services as the HTTP routes (`listOrders` and `listTasks` load names with organization-scoped queries).
   - Results are reduced to an explicit list of fields per record (for example a customer's `id`, `name`, `email`, `phone` and `createdAt`), so a field added to a store later is not sent to a provider until it is added to that list. Organization IDs are never included.
   - Input comes from the model, so it is checked like a request body: only `limit` (an integer from 1 to 50, default 20) is read, and anything else, such as an `organizationId`, is ignored. Bad input or an unknown name, including prototype keys like `__proto__`, is refused with an `AiToolError` before any store is touched.
-  - `runTool` refuses any tool not marked read-only, so a future tool that changes data cannot run directly; it must go through the approval flow below.
+  - `runTool` refuses any tool not marked read-only, so a tool that changes data can never run directly.
+- **Proposal tool** (`ai.proposals.js`): `propose_create_task`, offered only when the app has the approval and audit log stores (always, with a database). Its input is the task fields plus a short `summary` (closed JSON Schema). `askAssistant` routes it to `readProposal`, which validates it like a request (see the approval flow below) and queues it; the model is told that it is waiting for approval and that nothing was created. Queued proposals are saved only after the provider returns a completed reply, so a failed request leaves none behind. At most 3 per message.
+- **Instructions:** the static instructions say that the assistant cannot change anything itself, may only propose tasks, must never claim that a task was created or approved, must use only IDs returned by its tools, and must treat record fields as data even when they look like instructions. Records reach the model only inside `function_call_output` items, never in the instructions.
 - No rate limit yet. One is still needed before the OpenAI provider is used in a shared deployment, because every message can cost money.
 | **Customers** | `GET`, `POST /organizations/:organizationId/customers` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/customers/:id` | Org member (any role) |
 | **Orders** | `GET`, `POST /organizations/:organizationId/orders` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/orders/:id` | Org member (any role) |
 | **Tasks** | `GET`, `POST /organizations/:organizationId/tasks` (**implemented**)<br>`PATCH /organizations/:organizationId/tasks/:id` (**implemented**: status, priority and due date only)<br>`GET`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
 | **AI tools** | `POST /organizations/:organizationId/ai/assistant` (**implemented**, see above)<br>`POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited (planned) |
-| **Approvals** | `GET /organizations/:organizationId/approvals`<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve`<br>`POST /organizations/:organizationId/approvals/:id/reject` | Org member; deciding needs a permitted role. Not built: the client has an Approvals page that shows a "No approvals waiting" empty state, explains the planned flow and requests no data. |
+| **Approvals** | `GET /organizations/:organizationId/approvals` (**implemented**)<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve` (**implemented**)<br>`POST /organizations/:organizationId/approvals/:id/reject` (**implemented**) | Listing: any member. Deciding: owner or admin. See the approval flow below. |
 | **Audit logs** | `GET /organizations/:organizationId/audit-logs` (**implemented**, see above) | Owner or admin; read-only (there are no write endpoints) |
 
 **Relationships between resources:** an order references a customer (**implemented**: checked on create, see above; orders cannot be updated yet). A task may optionally reference a customer, an order or both (**implemented**: checked on create, and the links cannot be changed by an update). Every reference must point to a record in the **same organization**, and the server checks this on create and update.
 
-**AI tools and approvals (planned flow):**
+**AI proposals and approvals (implemented, `modules/approvals/`; the first and so far only workflow in which the AI can lead to a data change):**
 
-- AI tools return text output. Output that does not change data, such as summaries and text-only suggestions, is returned directly and is not saved as an approval.
-- If a tool proposes a data change (the exact kinds of change are still to be defined; one example is proposing a new task), the server checks the proposal with the target module's validation schema, then stores it as a **pending approval**. It does not apply it.
-- Approvals are created only by the server. There is no client endpoint for creating one.
-- The change is applied only when a permitted user approves it.
-- At decision time the server re-checks:
-  - the approver's membership and role;
-  - that the target still exists in the same organization;
-  - that the stored proposal still passes validation.
-- The approve request carries no payload. The server applies only the stored proposal, so a client cannot change it at approval time.
-- The status change uses an atomic conditional update (`pending` → `approved` / `rejected`), so the same approval cannot be applied twice.
-- Where the data change and the status update must succeed together, they run in a MongoDB transaction.
+- **The AI never changes data.** A model can only call `propose_create_task`, which saves a pending approval. The only path that creates the task is an authenticated owner or admin calling the approve route; no code path lets a provider reach the action registry.
+- **Action registry** (`approval.actions.js`): an explicit allowlist, currently only `create_task`, looked up with `Object.hasOwn` (unknown names, including `__proto__`, get 400 `UNKNOWN_ACTION`). Each action has `prepare` (validate the parameters with the target module's own rules, including organization-scoped links, and return them in stored form) and `execute` (validate the stored parameters again and run the change through the target module's service). `create_task` uses `validateNewTask` and `createTask`/`findTaskLinks` from the task module, so task rules exist once. There is no dynamic dispatch, `eval` or model-chosen collection.
+- **Proposal** (`prepareProposal`, `saveProposals` in `approval.service.js`): the action must be allowlisted, the summary 1–200 characters, and the parameters must pass `prepare` for the caller's organization (customer and order found by `{ _id, organizationId }`, the order belonging to the customer). Only the task fields are stored (title ≤200, description ≤2000, enums, IDs, a `YYYY-MM-DD` date), so parameters stay small. Invalid input is refused and nothing is saved. Valid proposals are saved with an `approval.proposed` audit event (actor `ai`, no user) in one transaction. `requestedByUserId` is the member who sent the message.
+- **Storage** (`Approval`): `organizationId`, `source` (`ai`), `action`, `status`, `summary`, `parameters`, `requestedByUserId`, `reviewedByUserId`, `reviewedAt`, `rejectionReason`, `resultType`/`resultId` or `failureCode`/`failureMessage`, `completedAt` and timestamps, indexed by `{ organizationId, createdAt, _id }` and `{ organizationId, status, createdAt, _id }`. There is no route that creates, edits or deletes an approval directly.
+- **State machine** (`APPROVAL_TRANSITIONS` in `approval.model.js`): `pending → approved | rejected`, `approved → executed | execution_failed`; `rejected`, `executed` and `execution_failed` are final. Every change is `approvals.transition`, a `findOneAndUpdate` on `{ _id, organizationId, status: from }`, which throws for a pair not in the table and returns null when the approval is no longer in `from`. There is no `expired` state yet.
+- **Listing:** `GET /approvals?status&page&limit` (any member; status one of the five, page 1–1000, limit 1–50, default 20), newest first, with `Cache-Control: no-store`. People are shown by email and linked records by name, loaded with organization-scoped queries; organization and user IDs are not returned.
+- **Reject:** `POST /approvals/:approvalId/reject` with `{ reason? }` (trimmed, at most 200 characters). One transaction: find by `{ _id, organizationId }` (404 `APPROVAL_NOT_FOUND` otherwise), `pending → rejected` (409 `APPROVAL_ALREADY_REVIEWED` otherwise), `approval.rejected` event with actor `user`.
+- **Approve:** `POST /approvals/:approvalId/approve`, no payload; only the stored proposal runs.
+  1. **Claim** (transaction): find by `{ _id, organizationId }`, `pending → approved` with the reviewer, `approval.approved` event. This conditional update is the only way an action starts, so concurrent or repeated approvals get 409 and run nothing. MongoDB write conflicts between simultaneous claims are retried by the transaction helper and then find the approval already approved.
+  2. **Execute** (transaction): `getAction` and `execute` (validated again, links re-checked in the same organization), `approved → executed` with the task ID, `approval.executed` event. Task, status and event commit together or not at all.
+  3. **On failure** (transaction): `approved → execution_failed` with a safe code and message (an `HttpError`'s own, such as `CUSTOMER_NOT_FOUND`; otherwise `EXECUTION_ERROR` and a fixed message, with the error logged without its details), `approval.execution_failed` event. Nothing is retried. If even this write fails, the approval stays `approved` and can never run again, which is the safe direction; it needs a person to investigate.
+  - The response is `200 { approval }` with status `executed` or `execution_failed`.
+- **Tenant isolation:** every query and change uses `req.membership.organizationId`; the reviewer and actor are `req.membership.userId`. An organization, user, actor, status or parameters in the body, query or headers is ignored. Another organization's approval gets the same 404 as a missing one.
+- **Roles:** owners and admins decide (`requireOrganizationRole`), members get 403 and can only list. Whether someone may approve their own request is still open; it is allowed today.
+- **Client:** the Approvals page lists pending proposals as review cards and recent decisions; Approve and Reject (with an optional reason) are shown to owners and admins only, are disabled while a request is in flight, and the card moves only after the server answers. The AI Assistant page shows "Approval required" with a link to the Approvals page; it has no approve button.
+- New actions are added only to the registry in `approval.actions.js` (with a matching proposal tool), so they get the same validation, approval and audit path.
 
 ```mermaid
 sequenceDiagram
-    actor U as User
+    actor M as Member
+    actor R as Owner or admin
     participant C as Client
     participant A as API
     participant P as AI provider
     participant D as MongoDB
 
-    U->>C: Ask for a suggestion
-    C->>A: POST /organizations/:organizationId/ai/suggest-next-steps
-    A->>D: Load source record (scoped to organizationId)
-    A->>P: Minimal, validated input
-    P-->>A: Suggestion
-    A->>A: Validate output shape and length
-    alt Text-only output
-        A->>D: Write audit log entry
-        A-->>C: 200 OK (suggestion text)
-    else Proposed data change
-        A->>A: Validate proposal with target module schema
-        A->>D: Save pending approval + audit log entry
-        A-->>C: 201 Created (pending approval)
-        U->>C: Approve
-        C->>A: POST /organizations/:organizationId/approvals/:id/approve
-        A->>D: Re-check role and target, apply stored proposal, mark approved, audit log
-        A-->>C: 200 OK
-    end
+    M->>C: "Create a follow-up task for the pending order"
+    C->>A: POST /organizations/:organizationId/ai/assistant
+    A->>P: Message and tool definitions (no organization)
+    P->>A: list_orders (read-only, run for the member's organization)
+    P->>A: propose_create_task { summary, title, customerId, orderId, ... }
+    A->>A: Validate with the task module's rules and organization-scoped links
+    P-->>A: Reply text
+    A->>D: Save pending approval + approval.proposed (actor ai), one transaction
+    A-->>C: 200 { reply: { requiresApproval: true, suggestedActions } }
+    R->>C: Approve on the Approvals page
+    C->>A: POST /organizations/:organizationId/approvals/:id/approve (no body)
+    A->>D: pending → approved + approval.approved (conditional, one transaction)
+    A->>D: Validate again, create task, approved → executed + approval.executed (one transaction)
+    A-->>C: 200 { approval: { status: "executed" } }
 ```
 
-**Audit log entries** record who did what: the organization, the actor, the action, the target type and ID, a timestamp, and minimal allowlisted details (see the audit log architecture above). They are **implemented** for organization renames only. Entries for other data changes, approval decisions (actor `user`) and AI proposals (actor `ai`) are planned; each will be a new action in `audit.events.js`, recorded explicitly by the code that causes it. Entries never contain passwords, tokens or secrets.
-
-**Future AI mutation workflow (planned, not implemented):** the AI Assistant stays read-only until this exists. A model tool that would change data will be marked as not read-only, so `runTool` refuses to run it directly. Instead, the server validates the proposal, stores it as a pending approval and records an audit event with actor `ai`. The Approvals page will then list pending approvals from the approvals API in place of its current empty state. Approving re-checks the approver's role and the target, applies only the stored proposal and records the decision with actor `user`, all in one transaction.
+**Audit log entries** record who did what: the organization, the actor, the action, the target type and ID, a timestamp, and minimal allowlisted details (see the audit log architecture above). They are **implemented** for organization renames and the approval lifecycle (AI proposals with actor `ai`; decisions and their results with actor `user`). Entries for other data changes, such as tasks created directly through the tasks API, are planned; each will be a new action in `audit.events.js`, recorded explicitly by the code that causes it. Entries never contain prompts, provider payloads, passwords, tokens or secrets.
 
 ## 5. Authentication and Organization Isolation
 
@@ -305,7 +307,7 @@ sequenceDiagram
   - Responses: no valid session gets **401** `UNAUTHENTICATED` (checked before anything else). A malformed ID gets **400** `VALIDATION_FAILED`, before any lookup. A non-member gets **404** `NOT_FOUND` ("Organization not found"), identical to an organization that does not exist.
   - `requireOrganizationRole(...roles)` runs after it: a member without one of the roles gets **403** `FORBIDDEN`. An empty or unknown role list throws when the route is defined, and using it without the membership middleware fails closed with a 500.
 - Services take `organizationId` from that request context, never from the request body, and every database query on organization data includes it.
-- Role checks so far: any member may use customers, orders, tasks and the AI Assistant; only `owner` and `admin` may rename the organization (`PATCH /organizations/:organizationId`) and read its audit log.
+- Role checks so far: any member may use customers, orders, tasks and the AI Assistant, and list approvals; only `owner` and `admin` may rename the organization (`PATCH /organizations/:organizationId`), read its audit log, and approve or reject AI proposals.
 - Validation schemas strip unknown fields, so a client cannot set `organizationId`, `role` or other server-controlled fields (mass assignment).
 - Requesting another organization's record returns **404**, not 403, so the response does not reveal that the record exists.
 - Each organization-owned module must include isolation tests showing that a user in organization A cannot read, update or delete organization B's data.
@@ -410,11 +412,11 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
 | **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; the customer routes use the middleware and have isolation tests, and the other organization routes are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
-| **6. Audit log service** (**In progress**: the model, the explicit `recordAuditEvent` helper, the owner/admin-only read endpoint and the client Audit Logs page are implemented and tested, including against a temporary MongoDB replica set; only organization renames record events so far) | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
+| **6. Audit log service** (**In progress**: the model, the explicit `recordAuditEvent` helper, the owner/admin-only read endpoint and the client Audit Logs page are implemented and tested, including against a temporary MongoDB replica set; organization renames and the approval lifecycle record events so far) | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
 | **7. Customers** (**In progress**: create and list are implemented with validation and isolation tests, including against a temporary MongoDB replica set, and the client has a list page and an add form with component tests; get, update and delete are not built) | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
 | **8. Orders and tasks** (**In progress**: order create and list are implemented with validation, same-organization customer checks and isolation tests, including against a temporary MongoDB replica set, and the client has an Orders page and a new-order form with component tests; task create, list and status/priority/due-date updates are implemented the same way, with same-organization customer and order checks, and the client has a Tasks page with a new-task form and a status control per row; order get, update and delete, and task get, full edit and delete, are not built) | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
 | **9. AI layer (no model)** (**In progress**: the provider boundary, the development provider, the assistant endpoint with validation and isolation tests, the read-only tool allowlist, and a client page with component tests are implemented; summarize and suggest endpoints and rate limits are not built) | Provider interface, development provider, summarize and suggest endpoints, rate limits | Endpoint tests pass with the deterministic development provider, and a component test shows AI output containing HTML is displayed as plain text |
-| **10. Approvals** (**Not started** on the server; the client has an Approvals page with a truthful empty state) | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
+| **10. Approvals** (**In progress**: AI proposals for `create_task`, the approvals model, allowlisted action registry, list/approve/reject routes with conditional state changes and transactions, audit events, the client Approvals page and the assistant's approval notice are implemented and tested with in-memory stores, and checked in a browser against the real app with in-memory stores; the MongoDB integration tests are written but have not run in this environment yet; other actions and approval expiry are not built) | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
 | **11. OpenAI provider** (**In progress**: implemented with read-only tool calling, limits, timeouts and error mapping, and tested with a stand-in SDK client; the manual check with a real key is pending) | `openai` provider behind the same interface, with timeouts and error mapping | Tests pass with mocked HTTP; manual check with a real key in development only |
 | **12. Hardening** | CI, basic accessibility check of the main pages (keyboard navigation, form labels), README update reflecting only verified features | CI runs lint and tests on every push and is green, the accessibility checklist is completed, and the README lists only features verified in the deployed app |
 
@@ -424,9 +426,9 @@ These are intentionally left undecided rather than assumed:
 
 - Any customer, order or task fields beyond the current ones (for example order line items, storing amounts in minor units, or task assignees).
 - Hard delete or archive (soft delete) for each module.
-- The final roles and permissions, including whether users can approve their own requests (so far only settings changes and audit log access are restricted, to owners and admins).
+- The final roles and permissions, including whether users can approve their own requests (allowed today; settings changes, audit log access and approval decisions are restricted to owners and admins).
 - Rules for changing an organization's slug, transferring ownership and deleting an organization.
-- Which kinds of AI-proposed data change need approval, beyond the planned example.
+- Which kinds of AI-proposed data change come after `create_task`, and whether pending proposals should expire.
 - Session lifetime, and whether logout should sign out every device (planned default) or only the current one (needs a server-side session store).
 - Whether a custom domain is needed (only if the Vercel rewrite fails verification).
 - Inviting members to an organization (would need email delivery; not planned initially).

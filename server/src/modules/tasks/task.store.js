@@ -19,9 +19,9 @@ function toTask(doc) {
 // `organizationId` must come from the verified membership, never from the request.
 export const taskStore = {
   // The caller must already have checked that any customer or order belongs to the organization
-  // (see createTask in task.service.js).
-  async create(organizationId, { title, description, status, priority, customerId, orderId, dueDate }) {
-    const doc = await new Task({ organizationId, title, description, status, priority, customerId, orderId, dueDate }).save();
+  // (see createTask in task.service.js). Pass `session` to make the insert part of a transaction.
+  async create(organizationId, { title, description, status, priority, customerId, orderId, dueDate }, { session } = {}) {
+    const doc = await new Task({ organizationId, title, description, status, priority, customerId, orderId, dueDate }).save({ session });
     return toTask(doc);
   },
 

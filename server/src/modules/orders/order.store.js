@@ -24,8 +24,8 @@ export const orderStore = {
   },
 
   // The order only if it belongs to the organization; otherwise null.
-  async findById(organizationId, orderId) {
-    const doc = await Order.findOne({ _id: orderId, organizationId }).lean();
+  async findById(organizationId, orderId, { session } = {}) {
+    const doc = await Order.findOne({ _id: orderId, organizationId }, null, { session }).lean();
     return doc && toOrder(doc);
   },
 

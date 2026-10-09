@@ -97,3 +97,65 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--text-xs);
 }
+
+/* Proposed changes, kept apart from the answer: they have not happened yet. */
+.assistant-proposals {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warning-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.assistant-proposals__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.assistant-proposals__title {
+  font-weight: 600;
+}
+
+.assistant-proposals__badge {
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.375rem;
+  color: var(--color-warning);
+  background: var(--color-surface);
+  border-radius: 999px;
+}
+
+.assistant-proposals__text,
+.assistant-proposals__summary {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.assistant-proposals__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-proposals__item {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.assistant-proposals__action {
+  font-weight: 600;
+}
+
+.assistant-proposals__link {
+  justify-self: start;
+}

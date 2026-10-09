@@ -32,8 +32,8 @@ const PAGE_CARDS = [
     href: '/assistant',
     title: 'AI Assistant',
     icon: 'assistant',
-    badge: 'Read-only',
-    text: 'Ask questions about your customers, orders and tasks. It can read your records but can’t change them.',
+    badge: 'Changes need approval',
+    text: 'Ask questions about your customers, orders and tasks. It can read your records and propose new tasks, but it can’t change anything until an owner or admin approves.',
     linkText: 'Open AI Assistant',
   },
 ];

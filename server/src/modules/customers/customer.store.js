@@ -20,8 +20,8 @@ export const customerStore = {
   },
 
   // The customer only if it belongs to the organization; otherwise null.
-  async findById(organizationId, customerId) {
-    const doc = await Customer.findOne({ _id: customerId, organizationId }).lean();
+  async findById(organizationId, customerId, { session } = {}) {
+    const doc = await Customer.findOne({ _id: customerId, organizationId }, null, { session }).lean();
     return doc && toCustomer(doc);
   },
 

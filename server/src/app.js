@@ -9,6 +9,7 @@ import { requestLogger } from './middleware/requestLogger.js';
 import { requireSameOrigin } from './middleware/sameOrigin.js';
 import { createAiRouter } from './modules/ai/ai.routes.js';
 import { developmentProvider } from './modules/ai/development.provider.js';
+import { createApprovalRouter } from './modules/approvals/approval.routes.js';
 import { createAuditLogRouter } from './modules/audit/audit.routes.js';
 import { createRequireAuth } from './modules/auth/auth.middleware.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
@@ -28,11 +29,13 @@ function authUnavailable(req, res, next) {
 }
 
 // `auth` ({ users, secret, secureCookie }), `organizationStores` ({ organizations, memberships,
-// withTransaction }), and the `customers`, `orders`, `tasks` and `auditLogs` stores are omitted
-// when the app runs without a database. Customer, order, task, audit log and AI routes need the
-// organization stores for their membership check; order routes also need the customer store, task
-// routes need the customer and order stores, and AI routes need all three record stores for their
-// tools. Changing an organization's settings needs the audit log store, as every change is audited.
+// withTransaction }), and the `customers`, `orders`, `tasks`, `auditLogs` and `approvals` stores
+// are omitted when the app runs without a database. Customer, order, task, audit log and AI routes
+// need the organization stores for their membership check; order routes also need the customer
+// store, task routes need the customer and order stores, and AI routes need all three record stores
+// for their tools. Changing an organization's settings needs the audit log store, as every change is
+// audited. AI proposals and the approval routes need the approval and audit log stores; without
+// them the AI Assistant only reads.
 // `aiProvider` answers AI Assistant messages (see modules/ai/ai.provider.js); it defaults to the
 // development provider, which connects to no model.
 export function createApp({
@@ -45,6 +48,7 @@ export function createApp({
   orders,
   tasks,
   auditLogs,
+  approvals,
   aiProvider = developmentProvider,
 } = {}) {
   const app = express();
@@ -81,10 +85,19 @@ export function createApp({
       }
       if (customers && orders && tasks) {
         app.use('/api/v1/organizations/:organizationId/tasks', createTaskRouter({ requireMembership, tasks, customers, orders }));
+
+        const approvalStores =
+          approvals && auditLogs ? { approvals, auditLogs, withTransaction: organizationStores.withTransaction } : undefined;
         app.use(
           '/api/v1/organizations/:organizationId/ai',
-          createAiRouter({ requireMembership, provider: aiProvider, customers, orders, tasks }),
+          createAiRouter({ requireMembership, provider: aiProvider, customers, orders, tasks, approvalStores }),
         );
+        if (approvalStores) {
+          app.use(
+            '/api/v1/organizations/:organizationId/approvals',
+            createApprovalRouter({ requireMembership, logger, ...approvalStores, users: auth.users, customers, orders, tasks }),
+          );
+        }
       }
     }
   } else {

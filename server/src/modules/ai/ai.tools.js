@@ -53,8 +53,8 @@ const toOrders = pick(['id', 'customerId', 'customerName', 'description', 'statu
 const toTasks = pick(['id', 'title', 'description', 'status', 'priority', 'dueDate', 'customerId', 'customerName', 'orderId', 'orderDescription', 'createdAt']);
 
 // The only operations an AI provider can ask the server to run. Each one goes through the
-// organization-scoped stores and services the HTTP routes use. All of them only read: a tool that
-// changes data must not run directly but become a proposal that a person approves (planned).
+// organization-scoped stores and services the HTTP routes use. All of them only read: a change is
+// never run by a tool, only proposed (see ai.proposals.js) for a person to approve.
 const TOOLS = [
   {
     name: 'list_customers',

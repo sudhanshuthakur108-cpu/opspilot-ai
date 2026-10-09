@@ -10,7 +10,7 @@ function listen(app, port) {
 
 // Connects required dependencies before accepting traffic, so a server that is
 // listening is never missing its database. Authentication and organizations are enabled with the database.
-export async function startServer({ config, logger, database, users, organizations, memberships, customers, orders, tasks, auditLogs }) {
+export async function startServer({ config, logger, database, users, organizations, memberships, customers, orders, tasks, auditLogs, approvals }) {
   const databaseEnabled = Boolean(config.database.uri);
 
   if (databaseEnabled) {
@@ -38,6 +38,7 @@ export async function startServer({ config, logger, database, users, organizatio
     orders: databaseEnabled ? orders : undefined,
     tasks: databaseEnabled ? tasks : undefined,
     auditLogs: databaseEnabled ? auditLogs : undefined,
+    approvals: databaseEnabled ? approvals : undefined,
     aiProvider: createAiProvider(config.ai, { logger }),
   });
   const server = await listen(app, config.port);

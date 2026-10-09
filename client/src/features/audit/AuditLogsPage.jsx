@@ -106,7 +106,7 @@ export function AuditLogsPage({ organization }) {
       <EmptyState
         icon="audit"
         title="No activity recorded yet"
-        description="Activity will appear here when important workspace actions occur, such as a change to the workspace name."
+        description="Activity will appear here when important workspace actions occur, such as a change to the workspace name or a decision on an AI proposal."
       />
     );
   } else {

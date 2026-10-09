@@ -146,6 +146,28 @@ describe('Audit Logs page', () => {
     ]);
   });
 
+  it('shows the lifecycle of an AI proposal: proposed by the AI, decided by a person, then made or failed', async () => {
+    const approval = (id, overrides) => entry({ id, resourceType: 'approval', resourceId: 'e'.repeat(24), ...overrides });
+    await openAuditLogs({
+      [`GET ${AUDIT_URL}`]: page([
+        approval('5'.repeat(24), { action: 'approval.execution_failed', details: { action: 'create_task', failureCode: 'CUSTOMER_NOT_FOUND' } }),
+        approval('4'.repeat(24), { action: 'approval.rejected', actorEmail: 'grace@example.com', details: { action: 'create_task', reason: 'Not now' } }),
+        approval('3'.repeat(24), { action: 'approval.executed', details: { action: 'create_task', resultType: 'task', resultId: 'f'.repeat(24) } }),
+        approval('2'.repeat(24), { action: 'approval.approved', details: { action: 'create_task' } }),
+        approval('1'.repeat(24), { action: 'approval.proposed', actorType: 'ai', actorEmail: null, details: { action: 'create_task', summary: 'Follow up on the order' } }),
+      ]),
+    });
+
+    await screen.findByRole('table');
+    expect(rows().map(({ Actor, Action, Resource, Details }) => ({ Actor, Action, Resource, Details }))).toEqual([
+      { Actor: 'ada@example.com (you)', Action: 'Approved change failed', Resource: 'Approval', Details: 'Create task. Failed (CUSTOMER_NOT_FOUND); nothing was changed' },
+      { Actor: 'grace@example.com', Action: 'Change rejected', Resource: 'Approval', Details: 'Create task. Reason: “Not now”' },
+      { Actor: 'ada@example.com (you)', Action: 'Approved change made', Resource: 'Approval', Details: 'Create task. Task created' },
+      { Actor: 'ada@example.com (you)', Action: 'Change approved', Resource: 'Approval', Details: 'Create task' },
+      { Actor: 'AI Assistant', Action: 'Change proposed', Resource: 'Approval', Details: 'Create task: “Follow up on the order”' },
+    ]);
+  });
+
   it('keeps the server’s newest-first order', async () => {
     await openAuditLogs({
       [`GET ${AUDIT_URL}`]: page([

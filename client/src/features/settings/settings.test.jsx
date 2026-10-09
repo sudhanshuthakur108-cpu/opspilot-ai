@@ -96,7 +96,7 @@ describe('Settings page', () => {
     expect(aboutPanel().getByText('Owner')).toBeTruthy();
     expect(aboutPanel().getByText('You can change workspace settings and view the audit log.')).toBeTruthy();
     expect(aboutPanel().getByText(USER.email)).toBeTruthy();
-    expect(aboutPanel().getByText('Read-only')).toBeTruthy();
+    expect(aboutPanel().getByText('Changes need approval')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'About this workspace' }).querySelector('time').getAttribute('dateTime')).toBe(
       ACME.createdAt,
     );

@@ -170,8 +170,10 @@ export function SettingsPage({ organization, onUpdated }) {
           <div>
             <dt>AI Assistant</dt>
             <dd>
-              <span className="settings-details__value">Read-only</span>
-              <span className="settings-details__note">It can read customers, orders and tasks, but can’t change them.</span>
+              <span className="settings-details__value">Changes need approval</span>
+              <span className="settings-details__note">
+                It can read customers, orders and tasks and propose new tasks. Nothing changes until an owner or admin approves.
+              </span>
             </dd>
           </div>
         </dl>

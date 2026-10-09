@@ -48,8 +48,12 @@ function outputText(response) {
     .join('');
 }
 
-// Drops the oldest records from the end of the list until the JSON fits.
+// Drops the oldest records from the end of the list until the JSON fits. Results that are not a
+// list of records (such as a proposal being accepted) are small and sent as they are.
 function toToolOutput(records) {
+  if (!Array.isArray(records)) {
+    return JSON.stringify(records);
+  }
   let shown = records;
   let output = JSON.stringify({ records: shown });
   while (output.length > TOOL_OUTPUT_MAX_LENGTH && shown.length > 0) {

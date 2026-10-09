@@ -2,6 +2,7 @@ import { loadConfig } from './config/env.js';
 import { connectDatabase, databaseState, disconnectDatabase, withTransaction } from './lib/database.js';
 import { logger } from './lib/logger.js';
 import { redactConnectionStrings } from './lib/redact.js';
+import { approvalStore } from './modules/approvals/approval.store.js';
 import { auditLogStore } from './modules/audit/audit.store.js';
 import { customerStore } from './modules/customers/customer.store.js';
 import { orderStore } from './modules/orders/order.store.js';
@@ -39,6 +40,7 @@ try {
     orders: orderStore,
     tasks: taskStore,
     auditLogs: auditLogStore,
+    approvals: approvalStore,
   }));
 } catch (error) {
   logger.error('startup failed', { error: errorFields(error) });

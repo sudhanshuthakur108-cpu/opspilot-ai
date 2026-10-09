@@ -4,7 +4,9 @@ import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Icon } from '../../components/Icon.jsx';
+import { Link } from '../../components/Link.jsx';
 import { TextField } from '../../components/TextField.jsx';
+import { actionLabel } from '../approvals/approvalDisplay.js';
 import '../../styles/records.css';
 import './Assistant.css';
 
@@ -27,9 +29,45 @@ function describeAssistantError(error) {
   return describeRequestError(error);
 }
 
-// Each tool once, even if the assistant used it more than once.
-const toolList = (tools) =>
-  tools.length > 0 ? [...new Set(tools.map(({ name }) => TOOL_LABELS[name] ?? name))].join(', ') : 'None';
+// Each read-only tool once, even if the assistant used it more than once. Proposals are listed
+// separately, as they are not data the assistant read.
+function toolList(tools) {
+  const reads = tools.filter((tool) => tool.readOnly);
+  return reads.length > 0 ? [...new Set(reads.map(({ name }) => TOOL_LABELS[name] ?? name))].join(', ') : 'None';
+}
+
+// Changes the assistant proposed in this reply. They are saved as pending approvals, so nothing
+// has changed yet; they are reviewed on the Approvals page, not approved from here.
+function Proposals({ actions }) {
+  const many = actions.length > 1;
+  return (
+    <div className="assistant-proposals" role="group" aria-labelledby="assistant-proposals-title">
+      <div className="assistant-proposals__header">
+        <p id="assistant-proposals-title" className="assistant-proposals__title">
+          Approval required
+        </p>
+        <span className="assistant-proposals__badge">Not created yet</span>
+      </div>
+      <p className="assistant-proposals__text">
+        The assistant proposed {many ? `${actions.length} changes` : 'a change'}. Nothing has been created: an owner or admin
+        must approve {many ? 'them' : 'it'} on the Approvals page first.
+      </p>
+      <ul className="assistant-proposals__list">
+        {actions.map((action) => (
+          <li key={action.approvalId} className="assistant-proposals__item">
+            <span className="assistant-proposals__action">
+              {actionLabel(action.action)}: {action.parameters?.title ?? action.summary}
+            </span>
+            <span className="assistant-proposals__summary">{action.summary}</span>
+          </li>
+        ))}
+      </ul>
+      <Link className="button button--primary button--small assistant-proposals__link" href="/approvals">
+        {many ? 'Review approvals' : 'Review approval'}
+      </Link>
+    </div>
+  );
+}
 
 // The latest message and the server's reply to it. Text from the server is rendered as plain
 // text, never as HTML.
@@ -60,6 +98,8 @@ function Reply({ message, reply }) {
           </div>
         </div>
       )}
+
+      {reply.suggestedActions.length > 0 && <Proposals actions={reply.suggestedActions} />}
 
       <dl className="assistant-details">
         <div>
@@ -158,8 +198,9 @@ export function AssistantPage({ organization }) {
     <div className="records">
       <div className="records__header">
         <p className="records__intro">
-          Ask about the customers, orders and tasks of <strong>{organization.name}</strong>. The assistant can only
-          read this workspace’s records; it can’t change them.
+          Ask about the customers, orders and tasks of <strong>{organization.name}</strong>. The assistant reads this
+          workspace’s records and can propose new tasks, but it can’t change anything: a proposal waits on the Approvals page
+          until an owner or admin approves it.
         </p>
       </div>
 

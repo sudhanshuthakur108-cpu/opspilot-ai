@@ -309,3 +309,93 @@ describe('AI Assistant page', () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 });
+
+describe('AI Assistant proposals', () => {
+  const PROPOSE_TOOL = { name: 'propose_create_task', description: 'Propose a task', readOnly: false };
+  const proposed = (overrides) => ({
+    approvalId: 'c'.repeat(24),
+    action: 'create_task',
+    status: 'pending',
+    summary: 'Follow up on the pending Initech order',
+    parameters: { title: 'Call Initech about their order', status: 'todo', priority: 'medium' },
+    ...overrides,
+  });
+  const proposalReply = (suggestedActions) =>
+    replied({
+      status: 'completed',
+      text: 'I proposed a follow-up task. It is waiting for approval.',
+      provider: 'openai',
+      toolCalls: [{ name: 'list_orders', readOnly: true }, ...suggestedActions.map(() => ({ name: 'propose_create_task', readOnly: false }))],
+      suggestedActions,
+      requiresApproval: true,
+      availableTools: [...AVAILABLE_TOOLS, PROPOSE_TOOL],
+    });
+  const proposals = () => within(screen.getByRole('group', { name: 'Approval required' }));
+
+  it('shows a proposal as waiting for approval, apart from the answer and the records read', async () => {
+    await openAssistant({ [`POST ${ASSISTANT_URL}`]: proposalReply([proposed()]) });
+
+    send('Create a follow-up task for the pending Initech order');
+
+    await screen.findByRole('group', { name: 'Approval required' });
+    expect(proposals().getByText('Create task: Call Initech about their order')).toBeTruthy();
+    expect(proposals().getByText('Follow up on the pending Initech order')).toBeTruthy();
+    expect(proposals().getByText('Not created yet')).toBeTruthy();
+    expect(proposals().getByText(/Nothing has been created: an owner or admin must approve it on the Approvals page first\./)).toBeTruthy();
+    expect(proposals().getByRole('link', { name: 'Review approval' }).getAttribute('href')).toBe('/approvals');
+
+    const details = Object.fromEntries(
+      [...screen.getByRole('region', { name: 'Response' }).querySelectorAll('dl > div')].map((row) => [
+        row.querySelector('dt').textContent,
+        row.querySelector('dd').textContent,
+      ]),
+    );
+    expect(details).toMatchObject({ 'Records read': 'Orders', 'Can read': 'Customers, Orders, Tasks', 'Suggested changes': '1', 'Needs approval': 'Yes' });
+    expect(screen.queryByRole('button', { name: /approve|reject/i })).toBeNull();
+    expect(screen.getByRole('main').textContent).not.toMatch(/task (was|has been) created|approved/i);
+  });
+
+  it('counts several proposals and links to all of them', async () => {
+    await openAssistant({
+      [`POST ${ASSISTANT_URL}`]: proposalReply([
+        proposed(),
+        proposed({ approvalId: 'd'.repeat(24), summary: 'Prepare the invoice', parameters: { title: 'Invoice Initech' } }),
+      ]),
+    });
+
+    send('Create two tasks');
+
+    await screen.findByRole('group', { name: 'Approval required' });
+    expect(proposals().getAllByRole('listitem')).toHaveLength(2);
+    expect(proposals().getByText(/proposed 2 changes/)).toBeTruthy();
+    expect(proposals().getByRole('link', { name: 'Review approvals' })).toBeTruthy();
+  });
+
+  it('shows no approval notice for a read-only answer', async () => {
+    await openAssistant({
+      [`POST ${ASSISTANT_URL}`]: replied({ status: 'completed', text: 'One order is pending.', provider: 'openai', availableTools: [...AVAILABLE_TOOLS, PROPOSE_TOOL] }),
+    });
+
+    send('Which orders are pending?');
+
+    await responsePanel().findByText('One order is pending.');
+    expect(screen.queryByRole('group', { name: 'Approval required' })).toBeNull();
+  });
+
+  it('opens the Approvals page from the proposal', async () => {
+    const approvalsUrl = `/api/v1/organizations/${ACME.id}/approvals`;
+    await openAssistant({
+      [`POST ${ASSISTANT_URL}`]: proposalReply([proposed()]),
+      [`GET ${approvalsUrl}?status=pending&limit=50`]: () => json(200, { approvals: [], page: 1, limit: 50, hasMore: false }),
+      [`GET ${approvalsUrl}?limit=20`]: () => json(200, { approvals: [], page: 1, limit: 20, hasMore: false }),
+    });
+    send('Create a follow-up task');
+    await screen.findByRole('group', { name: 'Approval required' });
+
+    fireEvent.click(proposals().getByRole('link', { name: 'Review approval' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Approvals' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/approvals');
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});
