@@ -11,7 +11,7 @@ The planned system has four parts:
 - **Client:** a React single-page app built with Vite and served as static files from Vercel.
 - **Server:** a Node.js + Express REST API hosted on Render.
 - **Database:** MongoDB Atlas, accessed only by the server.
-- **AI provider:** a server-side interface. The `development` implementation, which connects to no model, is in use; an `openai` implementation is planned.
+- **AI provider:** a server-side interface with two implementations, chosen by `AI_PROVIDER`: `development` (default), which connects to no model, and `openai`, which calls the OpenAI Responses API.
 
 ```mermaid
 flowchart LR
@@ -101,7 +101,7 @@ opspilot-ai/
 
 ## 4. Planned API Route Groups
 
-All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, `GET`, `POST` and `PATCH /organizations/:organizationId/tasks`, and `POST /organizations/:organizationId/ai/assistant` (without an AI model) are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
+All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, `GET`, `POST` and `PATCH /organizations/:organizationId/tasks`, and `POST /organizations/:organizationId/ai/assistant` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
 
 **Common conventions (planned):**
 
@@ -168,28 +168,35 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 - Responses: `201 { task }` and `200 { task }`, and `GET` returns `200 { tasks: [...] }` with `Cache-Control: no-store`: at most the 50 newest, by `createdAt` then ID. A task is `{ id, title, description, status, priority, customerId, customerName, orderId, orderDescription, dueDate, createdAt, updatedAt }`, with `null` for anything not set. Names are loaded with organization-scoped `$in` queries, not `populate`.
 - Tasks are stored with ObjectId references and an index on `{ organizationId: 1, createdAt: -1, _id: -1 }`. Updates find a task by `_id` (plus `organizationId`), which the built-in `_id` index covers, so there is no second index.
 
-**`POST /organizations/:organizationId/ai/assistant` (implemented as a foundation; no AI model is connected):**
+**`POST /organizations/:organizationId/ai/assistant` (implemented; the OpenAI provider is not yet verified against the real API):**
 
 - The same membership rules as the other organization routes: 401 without a session, 400 for a malformed organization ID, 404 for a non-member (checked before the body), and any role may use it. The organization is always `req.membership.organizationId`; an `organizationId` in the body, query or headers is ignored.
 - Body: `{ "message": string }`, trimmed, 1–2000 characters (**400** `VALIDATION_FAILED` otherwise). Other fields are ignored. The message is not stored or logged.
 - `200 { reply: { status, text, provider, toolCalls, suggestedActions, requiresApproval, availableTools, requestId } }` with `Cache-Control: no-store`.
-  - `status` is `not_configured` (no model; `text` is `null`) or `completed` (`text` is the provider's reply).
+  - `status` is `not_configured` (no model, or no API key; `text` is `null`) or `completed` (`text` is the model's answer). `provider` is `development` or `openai`; the model name is not returned.
   - `toolCalls` lists the tools that ran (`{ name, readOnly }`), and `availableTools` the allowlist (`{ name, description, readOnly }`).
   - `suggestedActions` is always `[]` and `requiresApproval` always `false`: there is no way yet to propose a change. Both are there for the approval flow below.
 - **Provider boundary** (`modules/ai/`): the route calls `askAssistant` in `ai.service.js`, which calls `provider.respond({ message, tools, runTool })`.
   - `tools` are plain tool definitions (name, description, read-only flag, JSON Schema for the input), never the functions that run them.
   - `runTool(name, input)` is a function the service has already bound to the membership's organization, so a provider can neither see nor choose the organization.
-  - The provider's result is untrusted: anything other than `{ status: "not_configured" }` or `{ status: "completed", text }` with 1–8000 characters of text gets **502** `AI_PROVIDER_ERROR`. A provider that throws gets the generic 500.
-  - `createApp` takes the provider as `aiProvider`, so tests pass fakes. The only real provider is `development.provider.js`, which makes no network call, runs no tools and always returns `not_configured`.
+  - The provider's result is untrusted: anything other than `{ status: "not_configured" }` or `{ status: "completed", text }` with 1–8000 characters of text gets **502** `AI_PROVIDER_ERROR`. A provider that throws anything other than these errors gets the generic 500.
+  - `createApp` takes the provider as `aiProvider` (tests pass fakes); `startServer` picks it from `AI_PROVIDER` with `createAiProvider` in `ai.provider.js`. `development.provider.js` makes no network call, runs no tools and always returns `not_configured`.
+- **OpenAI provider** (`openai.provider.js`, official `openai` SDK): a stateless tool-calling loop over `client.responses.create`.
+  - Each request sends `model` (`OPENAI_MODEL`), the fixed `instructions` in `assistant.instructions.js` (no organization, user or record data), the conversation so far as `input`, and the allowlisted tools as `function` tools. It sets `store: false`, so OpenAI does not keep the response, and asks for `reasoning.encrypted_content` so reasoning items can be sent back in the next round.
+  - When the output has `function_call` items, each one is run through `runTool(name, parsedArguments)` and its result is appended as a `function_call_output`, then the model is called again. Malformed JSON arguments, unknown tools and invalid input are sent back to the model as `{ "error": ... }` instead of running anything; any other tool failure (a database error) ends the request with the generic 500.
+  - Limits: at most 4 model calls per message, with `tool_choice: "none"` on the last so the model has to answer; at most 6 tool calls in total; each tool result at most 20,000 characters (the oldest records are dropped and `truncated: true` is added); `max_output_tokens` 4000; a 20-second timeout and one retry per SDK request; a 45-second deadline for the whole message.
+  - SDK errors map to fixed messages: rate limits (429), timeouts, network failures, the deadline and OpenAI 5xx get **503** `AI_PROVIDER_UNAVAILABLE`; a rejected key, missing permission, unknown model or bad request gets **502** `AI_PROVIDER_ERROR`. Only the error's class, status, type and code are logged, never its message, the prompt or the key.
+  - Without `OPENAI_API_KEY` the provider returns `not_configured` and never builds a client.
 - **Tool allowlist** (`ai.tools.js`): `list_customers`, `list_orders` and `list_tasks`, all read-only.
   - Each tool has a name, description, input schema, input check and run function. They run through the same organization-scoped stores and services as the HTTP routes (`listOrders` and `listTasks` load names with organization-scoped queries).
+  - Results are reduced to an explicit list of fields per record (for example a customer's `id`, `name`, `email`, `phone` and `createdAt`), so a field added to a store later is not sent to a provider until it is added to that list. Organization IDs are never included.
   - Input comes from the model, so it is checked like a request body: only `limit` (an integer from 1 to 50, default 20) is read, and anything else, such as an `organizationId`, is ignored. Bad input or an unknown name, including prototype keys like `__proto__`, is refused with an `AiToolError` before any store is touched.
   - `runTool` refuses any tool not marked read-only, so a future tool that changes data cannot run directly; it must go through the approval flow below.
-- No rate limit yet: the development provider costs nothing. One is planned with the OpenAI provider.
+- No rate limit yet. One is still needed before the OpenAI provider is used in a shared deployment, because every message can cost money.
 | **Customers** | `GET`, `POST /organizations/:organizationId/customers` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/customers/:id` | Org member (any role) |
 | **Orders** | `GET`, `POST /organizations/:organizationId/orders` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/orders/:id` | Org member (any role) |
 | **Tasks** | `GET`, `POST /organizations/:organizationId/tasks` (**implemented**)<br>`PATCH /organizations/:organizationId/tasks/:id` (**implemented**: status, priority and due date only)<br>`GET`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
-| **AI tools** | `POST /organizations/:organizationId/ai/assistant` (**implemented**, see above: no AI model yet)<br>`POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited (planned) |
+| **AI tools** | `POST /organizations/:organizationId/ai/assistant` (**implemented**, see above)<br>`POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited (planned) |
 | **Approvals** | `GET /organizations/:organizationId/approvals`<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve`<br>`POST /organizations/:organizationId/approvals/:id/reject` | Org member; deciding needs a permitted role |
 | **Audit logs** | `GET /organizations/:organizationId/audit-logs` | Org admin; read-only (there are no write endpoints) |
 
@@ -281,7 +288,7 @@ sequenceDiagram
 
 ### Environment variables
 
-- On the server, environment variables are read in one place (`server/src/config/`), validated at startup, and exported as a frozen config object. Startup fails fast with a clear message if a required value is missing or invalid. For example, `AI_PROVIDER=openai` without `OPENAI_API_KEY` or `OPENAI_MODEL` stops the server instead of silently falling back to the development provider.
+- On the server, environment variables are read in one place (`server/src/config/`), validated at startup, and exported as a frozen config object. Startup fails fast with a clear message if a required value is missing or invalid. For example, an unknown `AI_PROVIDER` stops the server. `AI_PROVIDER=openai` without `OPENAI_API_KEY` is allowed on purpose: the server logs that the key is missing and the assistant replies `not_configured`, rather than answering with anything made up.
 - No other server file reads `process.env` directly.
 - The client can only see `VITE_*` variables, which are bundled into public JavaScript and must never hold secrets.
 - The Vercel project gets only `VITE_*` variables. All server variables, and every secret, are set only on Render.
@@ -294,9 +301,9 @@ sequenceDiagram
 | `API_PROXY_TARGET` | Vite dev server config only (not bundled) | No | In use; in `client/.env.example` (defaults to `http://localhost:3000`) |
 | `CLIENT_ORIGIN` | Server | No | In use; in `server/.env.example` (Origin check; defaults to `http://localhost:5173` outside production; required, https, in production) |
 | `MONGODB_URI` | Server | **Yes** | In use; in `server/.env.example` (required in production, optional in development and test) |
-| `AI_PROVIDER` | Server | No | Planned (`development` or `openai`; until then the server always uses `development`) |
-| `OPENAI_API_KEY` | Server | **Yes** | Planned |
-| `OPENAI_MODEL` | Server | No | Planned |
+| `AI_PROVIDER` | Server | No | In use; in `server/.env.example` (`development`, the default, or `openai`) |
+| `OPENAI_API_KEY` | Server | **Yes** | In use; in `server/.env.example` (read only when `AI_PROVIDER=openai`) |
+| `OPENAI_MODEL` | Server | No | In use; in `server/.env.example` (defaults to `gpt-5.4-mini`) |
 | `JWT_SECRET` | Server | **Yes** | In use; in `server/.env.example` (at least 32 characters, required when `MONGODB_URI` is set) |
 
 Planned variables are added to `server/.env.example` in the phase that first uses them.
@@ -343,7 +350,7 @@ Tests focus on behavior that matters, following `CLAUDE.md`. Vitest runs both te
 | --- | --- |
 | Unit | Validation schemas, service logic, config validation, the AI tool allowlist and its organization scoping |
 | API integration | Status codes and response shapes, 401/403/404 paths, organization isolation, approval state transitions, audit log writes |
-| AI provider | The `openai` provider tested with a mocked HTTP layer. **Automated tests never call the real OpenAI API.** |
+| AI provider | The `openai` provider tested with a stand-in for the SDK client that returns Responses API payloads and throws the SDK's own error classes. **Automated tests never call the real OpenAI API.** |
 | Client | Key components and forms (React Testing Library), with API calls mocked |
 
 Tests for code that uses MongoDB transactions need a replica-set test database, because a standalone instance does not support transactions. The transaction tests skip themselves on a standalone server.
@@ -382,7 +389,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **8. Orders and tasks** (**In progress**: order create and list are implemented with validation, same-organization customer checks and isolation tests, including against a temporary MongoDB replica set, and the client has an Orders page and a new-order form with component tests; task create, list and status/priority/due-date updates are implemented the same way, with same-organization customer and order checks, and the client has a Tasks page with a new-task form and a status control per row; order get, update and delete, and task get, full edit and delete, are not built) | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
 | **9. AI layer (no model)** (**In progress**: the provider boundary, the development provider, the assistant endpoint with validation and isolation tests, the read-only tool allowlist, and a client page with component tests are implemented; summarize and suggest endpoints and rate limits are not built) | Provider interface, development provider, summarize and suggest endpoints, rate limits | Endpoint tests pass with the deterministic development provider, and a component test shows AI output containing HTML is displayed as plain text |
 | **10. Approvals** | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
-| **11. OpenAI provider** | `openai` provider behind the same interface, with timeouts and error mapping | Tests pass with mocked HTTP; manual check with a real key in development only |
+| **11. OpenAI provider** (**In progress**: implemented with read-only tool calling, limits, timeouts and error mapping, and tested with a stand-in SDK client; the manual check with a real key is pending) | `openai` provider behind the same interface, with timeouts and error mapping | Tests pass with mocked HTTP; manual check with a real key in development only |
 | **12. Hardening** | CI, basic accessibility check of the main pages (keyboard navigation, form labels), README update reflecting only verified features | CI runs lint and tests on every push and is green, the accessibility checklist is completed, and the README lists only features verified in the deployed app |
 
 ## 9. Open Questions

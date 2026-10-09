@@ -1,4 +1,4 @@
-// The provider used until a real model is connected. It makes no network call, runs no tools and
+// The default provider (AI_PROVIDER=development). It makes no network call, runs no tools and
 // generates no text; it only reports that no model is configured.
 //
 // Provider contract: `respond({ message, tools, runTool })` returns

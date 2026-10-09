@@ -14,7 +14,8 @@
     "express-rate-limit": "8.7.1",
     "helmet": "8.3.0",
     "jose": "6.2.12",
-    "mongoose": "9.11.0"
+    "mongoose": "9.11.0",
+    "openai": "7.31.0"
   },
   "devDependencies": {
     "supertest": "7.3.1",

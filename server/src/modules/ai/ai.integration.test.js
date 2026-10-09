@@ -19,6 +19,7 @@ import { taskStore } from '../tasks/task.store.js';
 import { User } from '../users/user.model.js';
 import { userStore } from '../users/user.store.js';
 import { TOOL_DEFINITIONS, runTool } from './ai.tools.js';
+import { createOpenAiProvider } from './openai.provider.js';
 
 // The AI tools and assistant route against MongoDB, with the real stores. Runs only when
 // MONGODB_TEST_URI points at a replica set (see organizations.integration.test.js).
@@ -113,5 +114,46 @@ describe.skipIf(!uri)('AI tools against MongoDB', () => {
     expect(own.body.reply.text).toBe('Initech, Initech supplies, Call Initech');
     expect(foreign.status).toBe(404);
     expect(foreign.text).not.toContain('Umbrella');
+  });
+
+  it('gives the OpenAI provider only the member’s records, even when the model names another organization', async () => {
+    const acme = new mongoose.Types.ObjectId().toString();
+    const globex = new mongoose.Types.ObjectId().toString();
+    await seed(acme, 'Initech');
+    await seed(globex, 'Umbrella');
+    const replies = [
+      {
+        status: 'completed',
+        output: TOOL_DEFINITIONS.map(({ name }) => ({
+          type: 'function_call',
+          call_id: `call_${name}`,
+          name,
+          arguments: JSON.stringify({ organizationId: globex, limit: 50 }),
+        })),
+      },
+      { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'Done.' }] }] },
+    ];
+    const sent = [];
+    const client = {
+      responses: {
+        async create(body) {
+          sent.push(body);
+          return replies.shift();
+        },
+      },
+    };
+    const provider = createOpenAiProvider({ apiKey: 'sk-test-key', model: 'gpt-5.4-mini', logger: captureLogger(), client });
+
+    const result = await provider.respond({
+      message: 'Summarize',
+      tools: TOOL_DEFINITIONS,
+      runTool: (name, input) => runTool(stores, acme, name, input),
+    });
+
+    expect(result).toEqual({ status: 'completed', text: 'Done.' });
+    const outputs = sent[1].input.filter((item) => item.type === 'function_call_output').map((item) => JSON.parse(item.output).records);
+    expect(outputs.map((records) => records.length)).toEqual([1, 1, 1]);
+    expect(JSON.stringify(outputs)).toContain('Initech');
+    expect(JSON.stringify(outputs)).not.toMatch(/Umbrella|organizationId|_id|__v/);
   });
 });

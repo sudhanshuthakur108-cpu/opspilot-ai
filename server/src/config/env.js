@@ -1,3 +1,4 @@
+import { readAiConfig } from './ai.js';
 import { readAuthConfig } from './auth.js';
 import { readDatabaseConfig } from './database.js';
 
@@ -28,6 +29,9 @@ export function loadConfig(env = process.env) {
   } = readAuthConfig(env, nodeEnv, { databaseEnabled: Boolean(database.uri) });
   errors.push(...authErrors);
 
+  const { ai, errors: aiErrors } = readAiConfig(env);
+  errors.push(...aiErrors);
+
   if (errors.length > 0) {
     throw new Error(`Invalid server configuration:\n- ${errors.join('\n- ')}`);
   }
@@ -38,5 +42,6 @@ export function loadConfig(env = process.env) {
     clientOrigin,
     database: Object.freeze(database),
     auth: Object.freeze(auth),
+    ai: Object.freeze(ai),
   });
 }

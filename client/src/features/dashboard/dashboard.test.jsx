@@ -102,12 +102,12 @@ describe('dashboard', () => {
     expect(within(activity).getByText('Changes your team makes in this workspace will appear here.')).toBeTruthy();
   });
 
-  it('links to the AI Assistant, marked as in development and without claiming it can answer', async () => {
+  it('links to the AI Assistant, marked as read-only and without claiming it can change anything', async () => {
     await renderDashboard();
 
     const card = within(screen.getByRole('main')).getByRole('heading', { level: 3, name: 'AI Assistant' }).closest('li');
-    expect(within(card).getByText('In development')).toBeTruthy();
-    expect(card.textContent).toContain('No AI model is connected yet');
+    expect(within(card).getByText('Read-only')).toBeTruthy();
+    expect(card.textContent).toContain('It can read your records but can’t change them.');
     expect(within(card).getByRole('link', { name: 'Open AI Assistant' }).getAttribute('href')).toBe('/assistant');
   });
 

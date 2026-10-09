@@ -31,7 +31,8 @@ function authUnavailable(req, res, next) {
 // runs without a database. Customer, order, task and AI routes need the organization stores for
 // their membership check; order routes also need the customer store, task routes need the customer
 // and order stores, and AI routes need all three record stores for their tools.
-// `aiProvider` answers AI Assistant messages; only the development provider exists so far.
+// `aiProvider` answers AI Assistant messages (see modules/ai/ai.provider.js); it defaults to the
+// development provider, which connects to no model.
 export function createApp({
   logger = defaultLogger,
   databaseState,

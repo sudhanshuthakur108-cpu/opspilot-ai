@@ -45,6 +45,13 @@ function readListInput(input) {
   return { limit };
 }
 
+// Tool results go to an outside AI service, so each record is reduced to an explicit list of fields.
+// A field added to a store later is not sent until it is added here.
+const pick = (fields) => (records) => records.map((record) => Object.fromEntries(fields.map((field) => [field, record[field] ?? null])));
+const toCustomers = pick(['id', 'name', 'email', 'phone', 'createdAt']);
+const toOrders = pick(['id', 'customerId', 'customerName', 'description', 'status', 'totalAmount', 'currency', 'createdAt']);
+const toTasks = pick(['id', 'title', 'description', 'status', 'priority', 'dueDate', 'customerId', 'customerName', 'orderId', 'orderDescription', 'createdAt']);
+
 // The only operations an AI provider can ask the server to run. Each one goes through the
 // organization-scoped stores and services the HTTP routes use. All of them only read: a tool that
 // changes data must not run directly but become a proposal that a person approves (planned).
@@ -55,7 +62,7 @@ const TOOLS = [
     readOnly: true,
     parameters: LIST_PARAMETERS,
     readInput: readListInput,
-    run: ({ customers }, organizationId, { limit }) => customers.listForOrganization(organizationId, { limit }),
+    run: async ({ customers }, organizationId, { limit }) => toCustomers(await customers.listForOrganization(organizationId, { limit })),
   },
   {
     name: 'list_orders',
@@ -63,7 +70,7 @@ const TOOLS = [
     readOnly: true,
     parameters: LIST_PARAMETERS,
     readInput: readListInput,
-    run: (stores, organizationId, { limit }) => listOrders(stores, organizationId, { limit }),
+    run: async (stores, organizationId, { limit }) => toOrders(await listOrders(stores, organizationId, { limit })),
   },
   {
     name: 'list_tasks',
@@ -71,7 +78,7 @@ const TOOLS = [
     readOnly: true,
     parameters: LIST_PARAMETERS,
     readInput: readListInput,
-    run: (stores, organizationId, { limit }) => listTasks(stores, organizationId, { limit }),
+    run: async (stores, organizationId, { limit }) => toTasks(await listTasks(stores, organizationId, { limit })),
   },
 ];
 

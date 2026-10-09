@@ -31,8 +31,8 @@ const PAGE_CARDS = [
     href: '/assistant',
     title: 'AI Assistant',
     icon: 'assistant',
-    badge: 'In development',
-    text: 'Ask about your customers, orders and tasks. No AI model is connected yet, so it can’t answer questions.',
+    badge: 'Read-only',
+    text: 'Ask questions about your customers, orders and tasks. It can read your records but can’t change them.',
     linkText: 'Open AI Assistant',
   },
 ];

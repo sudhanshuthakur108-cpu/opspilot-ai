@@ -12,13 +12,14 @@ import { signUp } from './testing/signUp.js';
 const DATABASE_URI = 'mongodb://app-user:pw-secret@db.example.com/opspilot';
 const CLIENT_ORIGIN = 'http://localhost:5173';
 
-function configWith(uri) {
+function configWith(uri, ai = { provider: 'development', openai: null }) {
   return {
     nodeEnv: 'test',
     port: 0,
     clientOrigin: CLIENT_ORIGIN,
     database: { uri },
     auth: { jwtSecret: uri ? 'test-secret-that-is-at-least-32-chars' : null },
+    ai,
   };
 }
 
@@ -40,10 +41,10 @@ function fakeDatabase() {
   };
 }
 
-function start(uri, { database = fakeDatabase(), logger = captureLogger() } = {}) {
+function start(uri, { database = fakeDatabase(), logger = captureLogger(), ai } = {}) {
   const { organizations, memberships } = createMemoryOrganizationStores();
   return startServer({
-    config: configWith(uri),
+    config: configWith(uri, ai),
     logger,
     database,
     users: createMemoryUserStore(),
@@ -231,5 +232,49 @@ describe('startServer without a database', () => {
     await shutdown('SIGTERM');
     expect(database.disconnect).not.toHaveBeenCalled();
     expect(server.listening).toBe(false);
+  });
+});
+
+describe('startServer AI provider selection', () => {
+  async function askAssistant(server) {
+    const { cookie } = await signUp(server, { origin: CLIENT_ORIGIN });
+    const created = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Acme', slug: 'acme' });
+    return request(server)
+      .post(`/api/v1/organizations/${created.body.organization.id}/ai/assistant`)
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ message: 'Which orders are pending?' });
+  }
+
+  it('uses the development provider by default', async () => {
+    const logs = captureLogger();
+    const { server, shutdown } = await start(DATABASE_URI, { logger: logs });
+
+    const response = await askAssistant(server);
+
+    expect(response.status).toBe(200);
+    expect(response.body.reply).toMatchObject({ status: 'not_configured', provider: 'development', text: null });
+    expect(logs.entries.find((entry) => entry.message === 'server started')).toMatchObject({ aiProvider: 'development' });
+    await shutdown('SIGTERM');
+  });
+
+  it('selects the OpenAI provider when configured, which replies not configured without a key', async () => {
+    const logs = captureLogger();
+    const ai = { provider: 'openai', openai: { apiKey: null, model: 'gpt-5.4-mini' } };
+    const { server, shutdown } = await start(DATABASE_URI, { logger: logs, ai });
+
+    const response = await askAssistant(server);
+
+    expect(response.status).toBe(200);
+    expect(response.body.reply).toMatchObject({ status: 'not_configured', provider: 'openai', text: null });
+    expect(logs.entries.map((entry) => entry.message)).toContain(
+      'OPENAI_API_KEY is not set: the AI Assistant will reply that it is not configured',
+    );
+    expect(logs.entries.find((entry) => entry.message === 'server started')).toMatchObject({ aiProvider: 'openai' });
+    await shutdown('SIGTERM');
   });
 });

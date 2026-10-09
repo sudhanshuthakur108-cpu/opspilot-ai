@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
 import { apiError, json, mockApi, requestsTo } from '../../testing/mockApi.js';
@@ -212,11 +212,56 @@ describe('AI Assistant page', () => {
     expect(responsePanel().queryByText('No answer was generated')).toBeNull();
   });
 
+  it('shows an OpenAI answer with the records it read, each listed once, and no model name', async () => {
+    await openAssistant({
+      [`POST ${ASSISTANT_URL}`]: replied({
+        status: 'completed',
+        text: 'You have one high-priority task:\n- Call Initech',
+        provider: 'openai',
+        toolCalls: [
+          { name: 'list_tasks', readOnly: true },
+          { name: 'list_customers', readOnly: true },
+          { name: 'list_tasks', readOnly: true },
+        ],
+      }),
+    });
+
+    send('What should I work on next?');
+
+    const panel = responsePanel();
+    const answerText = await panel.findByText(/You have one high-priority task/);
+    expect(answerText.textContent).toBe('You have one high-priority task:\n- Call Initech');
+    expect(panel.getByText('Assistant')).toBeTruthy();
+    const details = Object.fromEntries(
+      [...screen.getByRole('region', { name: 'Response' }).querySelectorAll('dl > div')].map((row) => [
+        row.querySelector('dt').textContent,
+        row.querySelector('dd').textContent,
+      ]),
+    );
+    expect(details).toMatchObject({ Provider: 'OpenAI', 'Records read': 'Tasks, Customers', 'Suggested changes': 'None', 'Needs approval': 'No' });
+    expect(screen.getByRole('main').textContent).not.toMatch(/gpt-|model:/i);
+    expect(panel.queryByText('No answer was generated')).toBeNull();
+  });
+
+  it('says no answer was generated when OpenAI is selected but has no key', async () => {
+    await openAssistant({ [`POST ${ASSISTANT_URL}`]: replied({ provider: 'openai' }) });
+
+    send('Which orders are still pending?');
+
+    expect(await responsePanel().findByText('No answer was generated')).toBeTruthy();
+    expect(responsePanel().queryByText('Assistant')).toBeNull();
+  });
+
   it.each([
     ['fails', () => apiError(500, 'INTERNAL_ERROR'), 'Something went wrong on our side. Please try again.'],
     ['cannot be reached', () => Promise.reject(new TypeError('Failed to fetch')), 'We couldn’t reach OpsPilot. Check your connection and try again.'],
     ['rejects the message', () => apiError(400, 'VALIDATION_FAILED'), 'Check your message and try again.'],
     ['gets no usable reply from the provider', () => apiError(502, 'AI_PROVIDER_ERROR'), 'The assistant couldn’t produce a reply. Please try again.'],
+    [
+      'finds the provider busy or too slow',
+      () => apiError(503, 'AI_PROVIDER_UNAVAILABLE'),
+      'The assistant is busy or took too long to answer. Please try again in a moment.',
+    ],
   ])('keeps the message and explains when the server %s', async (_, handler, message) => {
     await openAssistant({ [`POST ${ASSISTANT_URL}`]: handler });
 
@@ -227,7 +272,7 @@ describe('AI Assistant page', () => {
     expect(alert.textContent).not.toMatch(/server message|INTERNAL_ERROR|AI_PROVIDER_ERROR/);
     expect(messageField().value).toBe('Which orders are still pending?');
     expect(messageField().matches(':disabled')).toBe(false);
-    expect(document.activeElement).toBe(messageField());
+    await waitFor(() => expect(document.activeElement).toBe(messageField()));
     expect(responsePanel().getByText('Nothing asked yet')).toBeTruthy();
   });
 

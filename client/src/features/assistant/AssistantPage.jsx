@@ -12,7 +12,7 @@ import './Assistant.css';
 const MESSAGE_MAX_LENGTH = 2000;
 
 const TOOL_LABELS = { list_customers: 'Customers', list_orders: 'Orders', list_tasks: 'Tasks' };
-const PROVIDER_LABELS = { development: 'Development (no AI model connected)' };
+const PROVIDER_LABELS = { development: 'Development (no AI model connected)', openai: 'OpenAI' };
 
 function validate(message) {
   if (!message.trim()) return 'Enter a message.';
@@ -23,10 +23,13 @@ function validate(message) {
 function describeAssistantError(error) {
   if (error.status === 400) return 'Check your message and try again.';
   if (error.code === 'AI_PROVIDER_ERROR') return 'The assistant couldn’t produce a reply. Please try again.';
+  if (error.code === 'AI_PROVIDER_UNAVAILABLE') return 'The assistant is busy or took too long to answer. Please try again in a moment.';
   return describeRequestError(error);
 }
 
-const toolList = (tools) => (tools.length > 0 ? tools.map(({ name }) => TOOL_LABELS[name] ?? name).join(', ') : 'None');
+// Each tool once, even if the assistant used it more than once.
+const toolList = (tools) =>
+  tools.length > 0 ? [...new Set(tools.map(({ name }) => TOOL_LABELS[name] ?? name))].join(', ') : 'None';
 
 // The latest message and the server's reply to it. Text from the server is rendered as plain
 // text, never as HTML.

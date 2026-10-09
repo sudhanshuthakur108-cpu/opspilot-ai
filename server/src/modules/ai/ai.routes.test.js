@@ -1,3 +1,4 @@
+import { AuthenticationError, RateLimitError } from 'openai';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../app.js';
@@ -8,6 +9,7 @@ import { createMemoryOrganizationStores } from '../../testing/memoryOrganization
 import { createMemoryTaskStore } from '../../testing/memoryTaskStore.js';
 import { createMemoryUserStore } from '../../testing/memoryUserStore.js';
 import { signUp } from '../../testing/signUp.js';
+import { createOpenAiProvider } from './openai.provider.js';
 
 const ORIGIN = 'http://localhost:5173';
 const SECRET = 'test-secret-that-is-at-least-32-chars';
@@ -388,5 +390,136 @@ describe('AI assistant provider output', () => {
     expect(response.status).toBe(500);
     expect(response.body.error.code).toBe('INTERNAL_ERROR');
     expect(counts()).toEqual(before);
+  });
+});
+
+describe('AI assistant with the OpenAI provider', () => {
+  const API_KEY = 'sk-test-secret-key-do-not-leak';
+  const answer = (text) => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text }] }] });
+  const toolRequest = (name, args) => ({
+    status: 'completed',
+    output: [{ type: 'function_call', call_id: `call_${name}`, name, arguments: JSON.stringify(args) }],
+  });
+
+  // The real OpenAI provider around a stand-in SDK client. A result may be a function, so it can
+  // use IDs that only exist after setup.
+  function openAiProvider(...results) {
+    const create = vi.fn(async () => {
+      const next = results.shift();
+      if (next instanceof Error) throw next;
+      return typeof next === 'function' ? next() : next;
+    });
+    const logs = captureLogger();
+    const provider = createOpenAiProvider({ apiKey: API_KEY, model: 'gpt-5.4-mini', logger: logs, client: { responses: { create } } });
+    return { provider, create, logs };
+  }
+
+  const toolOutputs = (create) =>
+    create.mock.calls.flatMap(([body]) => body.input.filter((item) => item.type === 'function_call_output').map((item) => item.output));
+
+  it('answers from a read-only tool, reporting the tool used and no actions', async () => {
+    const { provider, create, logs: providerLogs } = openAiProvider(
+      toolRequest('list_tasks', { limit: 10 }),
+      answer('Your open task is Call Initech.'),
+    );
+    const { app, logs, counts, ada } = await setup({ aiProvider: provider });
+    const before = counts();
+
+    const response = await ask(app, ada.organizationId, ada.cookie, { message: 'What should I work on next?' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      reply: {
+        status: 'completed',
+        text: 'Your open task is Call Initech.',
+        provider: 'openai',
+        toolCalls: [{ name: 'list_tasks', readOnly: true }],
+        suggestedActions: [],
+        requiresApproval: false,
+        availableTools: TOOL_NAMES.map((name) => ({ name, description: expect.any(String), readOnly: true })),
+        requestId: response.headers['x-request-id'],
+      },
+    });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(counts()).toEqual(before);
+    expect(response.text).not.toContain(API_KEY);
+    expect(JSON.stringify([...logs.entries, ...providerLogs.entries])).not.toMatch(/sk-test|What should I work on/);
+  });
+
+  it('gives the model only the caller’s records, whatever organization the model or the request names', async () => {
+    let graceId;
+    const { provider, create } = openAiProvider(
+      () => ({
+        status: 'completed',
+        output: ['list_customers', 'list_orders', 'list_tasks'].map((name) => ({
+          type: 'function_call',
+          call_id: `call_${name}`,
+          name,
+          arguments: JSON.stringify({ organizationId: graceId, limit: 50 }),
+        })),
+      }),
+      answer('Initech is your only customer.'),
+    );
+    const { app, ada, grace } = await setup({ aiProvider: provider });
+    graceId = grace.organizationId;
+
+    const response = await request(app)
+      .post(`${assistantPath(ada.organizationId)}?organizationId=${grace.organizationId}`)
+      .set('Origin', ORIGIN)
+      .set('Cookie', ada.cookie)
+      .set('X-Organization-Id', grace.organizationId)
+      .send({ message: 'Show me everything', organizationId: grace.organizationId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.reply.toolCalls.map((call) => call.name)).toEqual(TOOL_NAMES);
+    const outputs = toolOutputs(create);
+    expect(outputs).toHaveLength(3);
+    expect(outputs.join('')).toContain('Initech');
+    expect(outputs.join('')).not.toMatch(/Umbrella|organizationId/);
+    expect(JSON.stringify(create.mock.calls)).not.toContain(ada.organizationId);
+  });
+
+  it('reports a refused tool call to the model without recording it as used', async () => {
+    const { provider, create } = openAiProvider(toolRequest('delete_customers', {}), answer('I can only read your records.'));
+    const { app, counts, ada } = await setup({ aiProvider: provider });
+    const before = counts();
+
+    const response = await ask(app, ada.organizationId, ada.cookie, { message: 'Delete all customers' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.reply).toMatchObject({ text: 'I can only read your records.', toolCalls: [], requiresApproval: false });
+    expect(toolOutputs(create)).toEqual([JSON.stringify({ error: 'There is no tool with this name' })]);
+    expect(counts()).toEqual(before);
+  });
+
+  it.each([
+    ['without a session', (ada) => [ada.organizationId, undefined], 401],
+    ['for another organization', (ada, grace) => [grace.organizationId, ada.cookie], 404],
+    ['for a malformed organization ID', (ada) => ['not-an-id', ada.cookie], 400],
+  ])('never calls OpenAI for a request %s', async (_, target, status) => {
+    const { provider, create } = openAiProvider(answer('unused'));
+    const { app, ada, grace } = await setup({ aiProvider: provider });
+    const [organizationId, cookie] = target(ada, grace);
+
+    const response = await ask(app, organizationId, cookie, { message: 'hello' });
+
+    expect(response.status).toBe(status);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['is rate limited', new RateLimitError(429, {}, `Rate limit for key ${API_KEY}`, new Headers()), 503, 'AI_PROVIDER_UNAVAILABLE', 'The assistant is unavailable right now. Try again shortly.'],
+    ['rejects the API key', new AuthenticationError(401, {}, `Incorrect API key provided: ${API_KEY}`, new Headers()), 502, 'AI_PROVIDER_ERROR', 'The assistant could not produce a reply'],
+    ['returns no text', answer('   '), 502, 'AI_PROVIDER_ERROR', 'The assistant could not produce a reply'],
+  ])('returns the standard error envelope when OpenAI %s', async (_, result, status, code, message) => {
+    const { provider } = openAiProvider(result);
+    const { app, logs, ada } = await setup({ aiProvider: provider });
+
+    const response = await ask(app, ada.organizationId, ada.cookie, { message: 'hello' });
+
+    expect(response.status).toBe(status);
+    expect(response.body).toEqual({ error: { code, message, requestId: response.headers['x-request-id'] } });
+    expect(response.text).not.toMatch(/sk-test|Rate limit|Incorrect API key/);
+    expect(JSON.stringify(logs.entries)).not.toContain(API_KEY);
   });
 });

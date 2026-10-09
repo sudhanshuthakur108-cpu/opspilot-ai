@@ -1,4 +1,5 @@
 import { createApp } from './app.js';
+import { createAiProvider } from './modules/ai/ai.provider.js';
 
 function listen(app, port) {
   return new Promise((resolve, reject) => {
@@ -19,6 +20,10 @@ export async function startServer({ config, logger, database, users, organizatio
     logger.info('database disabled: MONGODB_URI is not set');
   }
 
+  if (config.ai.provider === 'openai' && !config.ai.openai.apiKey) {
+    logger.info('OPENAI_API_KEY is not set: the AI Assistant will reply that it is not configured');
+  }
+
   const app = createApp({
     logger,
     clientOrigin: config.clientOrigin,
@@ -32,9 +37,10 @@ export async function startServer({ config, logger, database, users, organizatio
     customers: databaseEnabled ? customers : undefined,
     orders: databaseEnabled ? orders : undefined,
     tasks: databaseEnabled ? tasks : undefined,
+    aiProvider: createAiProvider(config.ai, { logger }),
   });
   const server = await listen(app, config.port);
-  logger.info('server started', { port: server.address().port, nodeEnv: config.nodeEnv });
+  logger.info('server started', { port: server.address().port, nodeEnv: config.nodeEnv, aiProvider: config.ai.provider });
 
   let closing;
   function shutdown(signal) {

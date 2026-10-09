@@ -8,6 +8,7 @@ describe('loadConfig', () => {
     clientOrigin: 'http://localhost:5173',
     database: { uri: null },
     auth: { jwtSecret: null },
+    ai: { provider: 'development', openai: null },
   };
 
   it('uses development defaults when nothing is set', () => {
@@ -37,6 +38,7 @@ describe('loadConfig', () => {
       clientOrigin: 'https://app.example.com',
       database: { uri: 'mongodb://127.0.0.1:27017/opspilot' },
       auth: { jwtSecret },
+      ai: { provider: 'development', openai: null },
     });
   });
 
@@ -53,8 +55,15 @@ describe('loadConfig', () => {
   });
 
   it('reports every problem at once', () => {
-    expect(() => loadConfig({ NODE_ENV: 'staging', PORT: 'abc', MONGODB_URI: 'nope' })).toThrow(
-      /NODE_ENV[\s\S]*PORT[\s\S]*MONGODB_URI/,
+    expect(() => loadConfig({ NODE_ENV: 'staging', PORT: 'abc', MONGODB_URI: 'nope', AI_PROVIDER: 'gpt' })).toThrow(
+      /NODE_ENV[\s\S]*PORT[\s\S]*MONGODB_URI[\s\S]*AI_PROVIDER/,
     );
+  });
+
+  it('reads the OpenAI settings when AI_PROVIDER is openai', () => {
+    expect(loadConfig({ AI_PROVIDER: 'openai', OPENAI_API_KEY: 'sk-test-key', OPENAI_MODEL: 'gpt-5.4-nano' }).ai).toEqual({
+      provider: 'openai',
+      openai: { apiKey: 'sk-test-key', model: 'gpt-5.4-nano' },
+    });
   });
 });
