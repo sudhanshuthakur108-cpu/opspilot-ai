@@ -18,7 +18,7 @@ export const NAV_SECTIONS = [
     id: 'ai',
     title: 'AI',
     items: [
-      { id: 'assistant', label: 'AI Assistant', icon: 'assistant' },
+      { id: 'assistant', label: 'AI Assistant', icon: 'assistant', href: '/assistant' },
       { id: 'approvals', label: 'Approvals', icon: 'approvals' },
     ],
   },

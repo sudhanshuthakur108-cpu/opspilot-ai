@@ -1,0 +1,99 @@
+.assistant-form__fields {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.assistant-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.assistant-reply {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.assistant-reply__block {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.assistant-reply__block--sent {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.assistant-reply__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Keeps the line breaks of the message and reply, which are plain text. */
+.assistant-reply__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.assistant-notice__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.assistant-notice__title {
+  font-weight: 600;
+}
+
+.assistant-notice__text {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.assistant-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.assistant-details dt {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.assistant-details dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.assistant-details__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+}

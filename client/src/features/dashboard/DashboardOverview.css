@@ -140,19 +140,6 @@
   box-shadow: var(--focus-ring);
 }
 
-.overview-card--upcoming {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border-strong);
-  border-style: dashed;
-  box-shadow: none;
-}
-
-.overview-card--upcoming .overview-card__icon {
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-}
-
 .status-badge {
   flex-shrink: 0;
   padding: 0 0.5rem;

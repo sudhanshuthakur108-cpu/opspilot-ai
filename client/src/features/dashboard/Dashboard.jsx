@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppHeader } from '../../components/AppHeader.jsx';
 import { Icon } from '../../components/Icon.jsx';
 import { navigate, usePathname } from '../../routing.js';
+import { AssistantPage } from '../assistant/AssistantPage.jsx';
 import { CustomersPage } from '../customers/CustomersPage.jsx';
 import { OrdersPage } from '../orders/OrdersPage.jsx';
 import { TasksPage } from '../tasks/TasksPage.jsx';
@@ -19,6 +20,7 @@ const PAGES = {
   '/customers': { id: 'customers', title: 'Customers' },
   '/orders': { id: 'orders', title: 'Orders' },
   '/tasks': { id: 'tasks', title: 'Tasks' },
+  '/assistant': { id: 'assistant', title: 'AI Assistant' },
 };
 
 // The signed-in app frame for one organization: sidebar, header and the current page.
@@ -95,6 +97,7 @@ export function Dashboard({ organization, justCreated }) {
           {page?.id === 'customers' && <CustomersPage organization={organization} />}
           {page?.id === 'orders' && <OrdersPage organization={organization} />}
           {page?.id === 'tasks' && <TasksPage organization={organization} />}
+          {page?.id === 'assistant' && <AssistantPage organization={organization} />}
           {(!page || page.id === 'dashboard') && (
             <DashboardOverview organization={organization} justCreated={justCreated} />
           )}

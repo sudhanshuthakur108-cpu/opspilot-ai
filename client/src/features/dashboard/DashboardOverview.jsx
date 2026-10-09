@@ -27,6 +27,14 @@ const PAGE_CARDS = [
     text: 'Track the work your team needs to do, for a customer or order or on its own.',
     linkText: 'View tasks',
   },
+  {
+    href: '/assistant',
+    title: 'AI Assistant',
+    icon: 'assistant',
+    badge: 'In development',
+    text: 'Ask about your customers, orders and tasks. No AI model is connected yet, so it can’t answer questions.',
+    linkText: 'Open AI Assistant',
+  },
 ];
 
 export function DashboardOverview({ organization, justCreated }) {
@@ -59,33 +67,21 @@ export function DashboardOverview({ organization, justCreated }) {
         <ul className="overview__cards">
           {PAGE_CARDS.map((card) => (
             <li key={card.href} className="overview-card">
-              <h3 className="overview-card__title">
-                <span className="overview-card__icon">
-                  <Icon name={card.icon} />
-                </span>
-                {card.title}
-              </h3>
+              <div className="overview-card__header">
+                <h3 className="overview-card__title">
+                  <span className="overview-card__icon">
+                    <Icon name={card.icon} />
+                  </span>
+                  {card.title}
+                </h3>
+                {card.badge && <span className="status-badge">{card.badge}</span>}
+              </div>
               <p className="overview-card__text">{card.text}</p>
               <Link className="overview-card__link" href={card.href}>
                 {card.linkText} <span aria-hidden="true">→</span>
               </Link>
             </li>
           ))}
-
-          <li className="overview-card overview-card--upcoming">
-            <div className="overview-card__header">
-              <h3 className="overview-card__title">
-                <span className="overview-card__icon">
-                  <Icon name="assistant" />
-                </span>
-                AI Assistant
-              </h3>
-              <span className="status-badge">Coming next</span>
-            </div>
-            <p className="overview-card__text">
-              Summaries of your operations and suggested next steps, based on your workspace’s own records.
-            </p>
-          </li>
         </ul>
       </section>
 

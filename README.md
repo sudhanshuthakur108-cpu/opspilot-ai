@@ -2,7 +2,7 @@
 
 OpsPilot AI is a planned operations management SaaS for teams. Teams will be able to track customers, orders and operational tasks, get AI-assisted suggestions, and approve AI-proposed changes before they are applied. It is an independent personal portfolio project.
 
-> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`) and organizations for signed-in users (`POST /api/v1/organizations` creates one with the caller as owner; `GET /api/v1/organizations` lists the caller's organizations and roles), customers for organization members (`POST` and `GET /api/v1/organizations/:organizationId/customers` create a customer and list the newest 50; the organization comes from the route and is checked against the caller's membership) and orders (`POST` and `GET /api/v1/organizations/:organizationId/orders`; each order belongs to one of the same organization's customers, which the server checks) and tasks (`POST`, `GET` and `PATCH /api/v1/organizations/:organizationId/tasks`; a task can link to a customer and order of the same organization, and only its status, priority and due date can change), plus a React client with sign-in and account creation, session restore on load and sign-out. After sign-in, a user without an organization is guided through creating one (the address is generated from the name); a user with an organization lands on the dashboard shell: a sidebar (an icon rail on medium screens, a drawer on small ones) with the workspace and the user's role, a header with the organization and the signed-in email, links to the Customers, Orders and Tasks pages, and an empty state for recent activity. The Customers page lists the organization's customers (name, email, phone, created date) and adds new ones through a form; customers cannot be edited or deleted yet. The Orders page lists orders (customer, description, status, amount in the order's currency, created date) and creates new ones for a chosen customer; orders cannot be edited or deleted yet. The Tasks page lists tasks (with their customer, order, priority, status and due date), creates new ones, and changes a task's status from its row; tasks cannot be edited otherwise or deleted yet. Only the Dashboard, Customers, Orders and Tasks sections exist; the other sections in the sidebar, and the AI Assistant, are shown as coming soon. A user in several organizations sees the first one, as there is no organization switching yet. Authentication and organizations require the database. The rest of the product features below are not implemented.
+> **Status: early scaffold.** The repository contains a minimal runnable app: an Express API with liveness and readiness endpoints (`GET /api/v1/health`, `GET /api/v1/ready`), request IDs, structured request logs, JSON error responses, an optional MongoDB connection, cookie-based authentication (`/api/v1/auth/register`, `login`, `logout`, `me`) and organizations for signed-in users (`POST /api/v1/organizations` creates one with the caller as owner; `GET /api/v1/organizations` lists the caller's organizations and roles), customers for organization members (`POST` and `GET /api/v1/organizations/:organizationId/customers` create a customer and list the newest 50; the organization comes from the route and is checked against the caller's membership) and orders (`POST` and `GET /api/v1/organizations/:organizationId/orders`; each order belongs to one of the same organization's customers, which the server checks) and tasks (`POST`, `GET` and `PATCH /api/v1/organizations/:organizationId/tasks`; a task can link to a customer and order of the same organization, and only its status, priority and due date can change), and the foundation of an AI Assistant (`POST /api/v1/organizations/:organizationId/ai/assistant`; see [AI Assistant](#ai-assistant)), plus a React client with sign-in and account creation, session restore on load and sign-out. After sign-in, a user without an organization is guided through creating one (the address is generated from the name); a user with an organization lands on the dashboard shell: a sidebar (an icon rail on medium screens, a drawer on small ones) with the workspace and the user's role, a header with the organization and the signed-in email, links to the Customers, Orders, Tasks and AI Assistant pages, and an empty state for recent activity. The Customers page lists the organization's customers (name, email, phone, created date) and adds new ones through a form; customers cannot be edited or deleted yet. The Orders page lists orders (customer, description, status, amount in the order's currency, created date) and creates new ones for a chosen customer; orders cannot be edited or deleted yet. The Tasks page lists tasks (with their customer, order, priority, status and due date), creates new ones, and changes a task's status from its row; tasks cannot be edited otherwise or deleted yet. The AI Assistant page sends one message at a time and shows the server's structured response; since no AI model is connected, that response says no answer was generated, and the page does not keep a conversation history. Only the Dashboard, Customers, Orders, Tasks and AI Assistant sections exist; the other sections in the sidebar are shown as coming soon. A user in several organizations sees the first one, as there is no organization switching yet. Authentication and organizations require the database. The rest of the product features below are not implemented.
 
 ## Planned Scope
 
@@ -24,18 +24,22 @@ Record fields, statuses and what each role (`owner`, `admin`, `member`) may do a
 | Testing  | Vitest, Supertest, React Testing Library (jsdom)             | In use  |
 | Database | MongoDB through Mongoose 9 (users, organizations, memberships) | In use |
 | Auth     | Argon2id (`@node-rs/argon2`), JWT session cookie (`jose`), `express-rate-limit` | In use |
-| AI       | Server-side provider interface: `mock` (default) or `openai` | Planned |
+| AI       | Server-side provider interface: `development` provider (no model) in use; `openai` planned | Partial |
 
 Other libraries, such as request validation and password hashing, are listed as candidates in the architecture document. They will be chosen in the phase that first needs them.
 
-### AI Providers
+### AI Assistant
 
-All AI calls will go through one provider interface on the server, selected by `AI_PROVIDER`:
+The AI Assistant is built up in stages. **No AI model is connected yet, and the OpenAI integration is not implemented.**
 
-- **`mock`** (default): will return deterministic responses with no API key and no cost. It is intended for development, automated tests and demos.
-- **`openai`** (optional): will call the OpenAI API using `OPENAI_API_KEY` and `OPENAI_MODEL`. The key will stay on the server and never be sent to the browser.
+What exists now:
 
-If `openai` is selected without its required settings, the server is planned to refuse to start rather than fall back to `mock`.
+- **Endpoint:** `POST /api/v1/organizations/:organizationId/ai/assistant` with `{ "message": string }` (trimmed, 1–2000 characters). It needs a signed-in member of the organization, like the other organization routes, and the organization always comes from that membership, never from the body, query or headers.
+- **Provider boundary:** the route calls a provider through one small interface, so it never depends on a particular AI service. The only provider is the `development` provider, which makes no network call, runs no tools and generates no text: every reply has `status: "not_configured"` and `text: null`.
+- **Read-only tool allowlist:** `list_customers`, `list_orders` and `list_tasks`. A provider can only ask the server to run one of these by name, and the server checks the input and runs it for the caller's organization. A provider never gets database access or chooses the organization. The development provider calls none of them.
+- **No changes through AI:** there are no tools that create, update or delete anything. They are planned to go through [human approval](docs/ARCHITECTURE.md#4-planned-api-route-groups), and every reply has `suggestedActions: []` and `requiresApproval: false`.
+
+Planned: an `openai` provider using the OpenAI Responses API with `OPENAI_API_KEY` and `OPENAI_MODEL`, selected by `AI_PROVIDER`. The key will stay on the server and never be sent to the browser. If `openai` is selected without its required settings, the server is planned to refuse to start rather than fall back to another provider. Automated tests never call a paid API.
 
 ## Architecture
 
@@ -57,10 +61,10 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 .
 ├── client/               # React + Vite frontend
 │   ├── src/
-│   │   ├── api/          # API client, auth and organization requests (cookie session, no stored tokens)
+│   │   ├── api/          # API client and per-resource requests, including the AI Assistant (cookie session, no stored tokens)
 │   │   ├── auth/         # auth state (React context)
 │   │   ├── components/   # shared UI: brand, header, loading screen, text and password fields
-│   │   ├── features/     # screens (auth, organizations: onboarding, dashboard: layout, sidebar and overview, customers, orders, tasks)
+│   │   ├── features/     # screens (auth, organizations: onboarding, dashboard: layout, sidebar and overview, customers, orders, tasks, assistant)
 │   │   └── styles/       # design tokens and global CSS
 │   └── .env.example
 ├── server/               # Express API
@@ -69,7 +73,7 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 │   │   ├── lib/          # database connection, logger, error class, redaction
 │   │   ├── middleware/   # request IDs, logging, same-origin check, 404 and errors
 │   │   ├── testing/      # test helpers (logger and user-store stand-ins)
-│   │   ├── modules/      # feature modules (health, auth, users, organizations, customers, orders, tasks)
+│   │   ├── modules/      # feature modules (health, auth, users, organizations, customers, orders, tasks, ai)
 │   │   ├── app.js        # builds the Express app (used by tests)
 │   │   └── server.js     # validates config and starts listening
 │   └── .env.example

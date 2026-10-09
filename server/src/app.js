@@ -7,6 +7,8 @@ import { createErrorHandler, notFound } from './middleware/errors.js';
 import { requestId } from './middleware/requestId.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { requireSameOrigin } from './middleware/sameOrigin.js';
+import { createAiRouter } from './modules/ai/ai.routes.js';
+import { developmentProvider } from './modules/ai/development.provider.js';
 import { createRequireAuth } from './modules/auth/auth.middleware.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createSessions } from './modules/auth/session.js';
@@ -26,8 +28,10 @@ function authUnavailable(req, res, next) {
 
 // `auth` ({ users, secret, secureCookie }), `organizationStores` ({ organizations, memberships,
 // withTransaction }), and the `customers`, `orders` and `tasks` stores are omitted when the app
-// runs without a database. Customer, order and task routes need the organization stores for their
-// membership check; order routes also need the customer store, and task routes need both.
+// runs without a database. Customer, order, task and AI routes need the organization stores for
+// their membership check; order routes also need the customer store, task routes need the customer
+// and order stores, and AI routes need all three record stores for their tools.
+// `aiProvider` answers AI Assistant messages; only the development provider exists so far.
 export function createApp({
   logger = defaultLogger,
   databaseState,
@@ -37,6 +41,7 @@ export function createApp({
   customers,
   orders,
   tasks,
+  aiProvider = developmentProvider,
 } = {}) {
   const app = express();
 
@@ -66,6 +71,10 @@ export function createApp({
       }
       if (customers && orders && tasks) {
         app.use('/api/v1/organizations/:organizationId/tasks', createTaskRouter({ requireMembership, tasks, customers, orders }));
+        app.use(
+          '/api/v1/organizations/:organizationId/ai',
+          createAiRouter({ requireMembership, provider: aiProvider, customers, orders, tasks }),
+        );
       }
     }
   } else {
