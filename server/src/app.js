@@ -12,6 +12,7 @@ import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createSessions } from './modules/auth/session.js';
 import { createCustomerRouter } from './modules/customers/customer.routes.js';
 import { createOrderRouter } from './modules/orders/order.routes.js';
+import { createTaskRouter } from './modules/tasks/task.routes.js';
 import { createHealthRouter } from './modules/health/health.routes.js';
 import { createRequireMembership } from './modules/organizations/organization.middleware.js';
 import { createOrganizationRouter } from './modules/organizations/organization.routes.js';
@@ -24,9 +25,9 @@ function authUnavailable(req, res, next) {
 }
 
 // `auth` ({ users, secret, secureCookie }), `organizationStores` ({ organizations, memberships,
-// withTransaction }), `customers` and `orders` (the customer and order stores) are omitted when
-// the app runs without a database. Customer and order routes need the organization stores for
-// their membership check, and order routes also need the customer store.
+// withTransaction }), and the `customers`, `orders` and `tasks` stores are omitted when the app
+// runs without a database. Customer, order and task routes need the organization stores for their
+// membership check; order routes also need the customer store, and task routes need both.
 export function createApp({
   logger = defaultLogger,
   databaseState,
@@ -35,6 +36,7 @@ export function createApp({
   organizationStores,
   customers,
   orders,
+  tasks,
 } = {}) {
   const app = express();
 
@@ -61,6 +63,9 @@ export function createApp({
       }
       if (customers && orders) {
         app.use('/api/v1/organizations/:organizationId/orders', createOrderRouter({ requireMembership, orders, customers }));
+      }
+      if (customers && orders && tasks) {
+        app.use('/api/v1/organizations/:organizationId/tasks', createTaskRouter({ requireMembership, tasks, customers, orders }));
       }
     }
   } else {

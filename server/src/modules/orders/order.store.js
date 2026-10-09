@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Order } from './order.model.js';
 
 function toOrder(doc) {
@@ -20,6 +21,20 @@ export const orderStore = {
   async create(organizationId, { customerId, description, status, totalAmount, currency }) {
     const doc = await new Order({ organizationId, customerId, description, status, totalAmount, currency }).save();
     return toOrder(doc);
+  },
+
+  // The order only if it belongs to the organization; otherwise null.
+  async findById(organizationId, orderId) {
+    const doc = await Order.findOne({ _id: orderId, organizationId }).lean();
+    return doc && toOrder(doc);
+  },
+
+  // The organization's orders among `ids`, in no particular order. sanitizeFilter would
+  // neutralize `$in`; it is marked trusted because callers pass IDs from stored records, never
+  // from the request.
+  async findByIds(organizationId, ids) {
+    const docs = await Order.find({ organizationId, _id: mongoose.trusted({ $in: ids }) }).lean();
+    return docs.map(toOrder);
   },
 
   // Newest first. Ties on createdAt fall back to _id, which also grows over time.

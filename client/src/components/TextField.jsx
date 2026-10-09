@@ -2,8 +2,10 @@ import { useState } from 'react';
 import './TextField.css';
 
 // A labelled input with an optional hint and error message, wired up for screen readers.
-// `trailing` renders inside the input frame (used by PasswordField for its toggle).
-export function TextField({ id, label, hint, error, trailing, ref, ...inputProps }) {
+// `trailing` renders inside the input frame (used by PasswordField for its toggle), and
+// `multiline` makes it a <textarea>.
+export function TextField({ id, label, hint, error, trailing, multiline = false, ref, ...inputProps }) {
+  const Input = multiline ? 'textarea' : 'input';
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(' ');
@@ -14,10 +16,10 @@ export function TextField({ id, label, hint, error, trailing, ref, ...inputProps
         {label}
       </label>
       <div className={error ? 'field__control field__control--invalid' : 'field__control'}>
-        <input
+        <Input
           id={id}
           ref={ref}
-          className="field__input"
+          className={multiline ? 'field__input field__input--multiline' : 'field__input'}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
           {...inputProps}

@@ -11,7 +11,7 @@ export const NAV_SECTIONS = [
     items: [
       { id: 'customers', label: 'Customers', icon: 'customers', href: '/customers' },
       { id: 'orders', label: 'Orders', icon: 'orders', href: '/orders' },
-      { id: 'tasks', label: 'Tasks', icon: 'tasks' },
+      { id: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
     ],
   },
   {

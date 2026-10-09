@@ -61,6 +61,14 @@
   outline: none;
 }
 
+.field__input--multiline {
+  height: auto;
+  min-height: 5.5rem;
+  padding: 0.625rem 0.875rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .field__select {
   padding-right: 2.5rem;
   appearance: none;

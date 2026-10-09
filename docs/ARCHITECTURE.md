@@ -101,7 +101,7 @@ opspilot-ai/
 
 ## 4. Planned API Route Groups
 
-All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, and `GET` and `POST /organizations/:organizationId/orders` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
+All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organizations`, `GET /organizations`, `GET` and `POST /organizations/:organizationId/customers`, `GET` and `POST /organizations/:organizationId/orders`, and `GET`, `POST` and `PATCH /organizations/:organizationId/tasks` are implemented; the rest are planned. Routes for organization-owned data are nested under `/organizations/:organizationId`, so the active organization is explicit in every request and checked against the user's memberships.
 
 **Common conventions (planned):**
 
@@ -153,14 +153,28 @@ All routes are prefixed with `/api/v1`. The health and auth routes, `POST /organ
 - `201 { order: { id, customerId, customerName, description, status, totalAmount, currency, createdAt } }`. `GET` returns `200 { orders: [...] }` with `Cache-Control: no-store`: at most the 50 newest, ordered by `createdAt` then ID (newest first). There is no paging yet.
 - `customerName` is the customer's current name, loaded with a second query scoped to the organization (`{ organizationId, _id: { $in: ids } }`), not with Mongoose `populate`, which would look customers up by ID alone.
 - Orders are stored with `organizationId` and `customerId` as ObjectIds and an index on `{ organizationId: 1, createdAt: -1, _id: -1 }`. No query filters orders by customer yet, so there is no customer index.
+
+**`GET`, `POST` and `PATCH /organizations/:organizationId/tasks` (implemented):**
+
+- The same membership rules as customers and orders, and any role may list, create and update. The organization is always `req.membership.organizationId`; an `organizationId` in the body, query or headers is ignored.
+- `POST` body: `{ "title": string, "description"?: string, "status"?: string, "priority"?: string, "customerId"?: string, "orderId"?: string, "dueDate"?: string }`.
+  - `title` is trimmed, 1–200 characters; `description` is optional, trimmed, at most 2000.
+  - `status` is `todo` (default), `in_progress` or `completed`; `priority` is `low`, `medium` (default) or `high`.
+  - `customerId` and `orderId` are optional ObjectId strings (400 if malformed).
+  - `dueDate` is an optional calendar day, `"YYYY-MM-DD"`, which must exist (so not `2026-02-30`). It is stored as midnight UTC and always returned as `"YYYY-MM-DD"`, so it never shifts with the reader's time zone.
+  - Missing, null and empty optional fields are all "not given". Other fields are ignored and never stored.
+- **Customer and order links:** a given customer is looked up by `{ _id, organizationId }` and an order the same way. One that does not match gets **404** `CUSTOMER_NOT_FOUND` or `ORDER_NOT_FOUND`, so another organization's record is indistinguishable from a missing one, and nothing is written. When both are given, the order must be for that customer (**400** `VALIDATION_FAILED` otherwise), so a task never points at a contradictory pair. The client prevents this too: picking an order fills in its customer.
+- `PATCH /tasks/:taskId` body: any of `{ "status", "priority", "dueDate" }`, at least one; a null or empty `dueDate` clears it. The title, description, customer, order and organization cannot change, and those fields in the body are ignored. A malformed task ID gets 400. The update matches `{ _id: taskId, organizationId }`, so another organization's task gets the same **404** `TASK_NOT_FOUND` as one that does not exist, and is not changed.
+- Responses: `201 { task }` and `200 { task }`, and `GET` returns `200 { tasks: [...] }` with `Cache-Control: no-store`: at most the 50 newest, by `createdAt` then ID. A task is `{ id, title, description, status, priority, customerId, customerName, orderId, orderDescription, dueDate, createdAt, updatedAt }`, with `null` for anything not set. Names are loaded with organization-scoped `$in` queries, not `populate`.
+- Tasks are stored with ObjectId references and an index on `{ organizationId: 1, createdAt: -1, _id: -1 }`. Updates find a task by `_id` (plus `organizationId`), which the built-in `_id` index covers, so there is no second index.
 | **Customers** | `GET`, `POST /organizations/:organizationId/customers` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/customers/:id` | Org member (any role) |
 | **Orders** | `GET`, `POST /organizations/:organizationId/orders` (**implemented**)<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/orders/:id` | Org member (any role) |
-| **Tasks** | `GET`, `POST /organizations/:organizationId/tasks`<br>`GET`, `PATCH`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
+| **Tasks** | `GET`, `POST /organizations/:organizationId/tasks` (**implemented**)<br>`PATCH /organizations/:organizationId/tasks/:id` (**implemented**: status, priority and due date only)<br>`GET`, `DELETE /organizations/:organizationId/tasks/:id` | Org member |
 | **AI tools** | `POST /organizations/:organizationId/ai/summarize`<br>`POST /organizations/:organizationId/ai/suggest-next-steps` | Org member; rate limited |
 | **Approvals** | `GET /organizations/:organizationId/approvals`<br>`GET /organizations/:organizationId/approvals/:id`<br>`POST /organizations/:organizationId/approvals/:id/approve`<br>`POST /organizations/:organizationId/approvals/:id/reject` | Org member; deciding needs a permitted role |
 | **Audit logs** | `GET /organizations/:organizationId/audit-logs` | Org admin; read-only (there are no write endpoints) |
 
-**Relationships between resources:** an order references a customer (**implemented**: checked on create, see above; orders cannot be updated yet). A task may optionally reference a customer or an order (planned). Every reference must point to a record in the **same organization**, and the server checks this on create and update.
+**Relationships between resources:** an order references a customer (**implemented**: checked on create, see above; orders cannot be updated yet). A task may optionally reference a customer, an order or both (**implemented**: checked on create, and the links cannot be changed by an update). Every reference must point to a record in the **same organization**, and the server checks this on create and update.
 
 **AI tools and approvals (planned flow):**
 
@@ -228,12 +242,12 @@ sequenceDiagram
 - **Brute-force protection:** login and register share a limit of 10 attempts per client IP per 15 minutes (in memory, per instance). The IP is only correct once the `trust proxy` setting is configured (see [Section 6](#error-handling-planned)). A per-account login limit is still planned. Login failures return a generic message that does not reveal whether the email exists, and an unknown email still runs a full password verification so response timing is similar.
 - **Registration** returns 409 for an email that is already registered. This reveals that the account exists, which cannot be avoided without email verification; the rate limit slows scanning.
 
-### Organization-level data isolation (membership checks implemented; customers and orders are organization-owned resources)
+### Organization-level data isolation (membership checks implemented; customers, orders and tasks are organization-owned resources)
 
 - Every organization-owned document stores an `organizationId`, and its indexes start with `organizationId`.
 - A membership collection links users to organizations and stores a role: `owner`, `admin` or `member`, defined once in `modules/organizations/roles.js`. What each role may do is still undecided.
 - **Implemented:** the Organization model (unique `slug`), the Membership model (one membership per user per organization), their stores, and a service that creates an organization together with its owner membership in a single transaction, so an organization never exists without an owner.
-- **Implemented:** membership middleware for routes under `/organizations/:organizationId/...`, in `modules/organizations/organization.middleware.js`. The customer and order routes use it. It runs on every request, so a removed membership takes effect immediately.
+- **Implemented:** membership middleware for routes under `/organizations/:organizationId/...`, in `modules/organizations/organization.middleware.js`. The customer, order and task routes use it. It runs on every request, so a removed membership takes effect immediately.
   - `createRequireMembership({ requireAuth, memberships })` returns `[requireAuth, checkMembership]`, so authentication always runs first.
   - It checks the `:organizationId` route parameter against the authenticated user's ID with `memberships.find`. A user ID, role or organization ID anywhere else in the request is ignored.
   - It attaches only `req.membership = { id, organizationId, userId, role }`.
@@ -346,7 +360,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; the customer routes use the middleware and have isolation tests, and the other organization routes are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
 | **6. Audit log service** | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
 | **7. Customers** (**In progress**: create and list are implemented with validation and isolation tests, including against a temporary MongoDB replica set, and the client has a list page and an add form with component tests; get, update and delete are not built) | First organization-owned module; sets the pattern for later modules | CRUD, validation and isolation tests pass, and component tests for the client list and form pass |
-| **8. Orders and tasks** (**In progress**: order create and list are implemented with validation, same-organization customer checks and isolation tests, including against a temporary MongoDB replica set, and the client has an Orders page and a new-order form with component tests; order get, update and delete, and all of tasks, are not built) | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
+| **8. Orders and tasks** (**In progress**: order create and list are implemented with validation, same-organization customer checks and isolation tests, including against a temporary MongoDB replica set, and the client has an Orders page and a new-order form with component tests; task create, list and status/priority/due-date updates are implemented the same way, with same-organization customer and order checks, and the client has a Tasks page with a new-task form and a status control per row; order get, update and delete, and task get, full edit and delete, are not built) | Two modules following the customer pattern, with same-organization reference checks | Tests pass, including rejection of references to another organization's records |
 | **9. AI layer (mock)** | Provider interface, mock provider, summarize and suggest endpoints, rate limits | Endpoint tests pass with deterministic mock output, and a component test shows AI output containing HTML is displayed as plain text |
 | **10. Approvals** | Pending approvals for AI-proposed data changes; approve and reject; transactions | Tests cover: an approval applies exactly once, the reject path, approver permissions, re-validation failure at approval time, text-only output not creating an approval, and audit entries |
 | **11. OpenAI provider** | `openai` provider behind the same interface, with timeouts and error mapping | Tests pass with mocked HTTP; manual check with a real key in development only |
@@ -356,7 +370,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 
 These are intentionally left undecided rather than assumed:
 
-- The fields and statuses for tasks, and any customer or order fields beyond the current ones (for example line items, or storing amounts in minor units).
+- Any customer, order or task fields beyond the current ones (for example order line items, storing amounts in minor units, or task assignees).
 - Hard delete or archive (soft delete) for each module.
 - The final roles and permissions, including whether users can approve their own requests.
 - Which kinds of AI-proposed data change need approval, beyond the planned example.

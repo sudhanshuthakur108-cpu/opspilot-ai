@@ -4,6 +4,7 @@ import { Icon } from '../../components/Icon.jsx';
 import { navigate, usePathname } from '../../routing.js';
 import { CustomersPage } from '../customers/CustomersPage.jsx';
 import { OrdersPage } from '../orders/OrdersPage.jsx';
+import { TasksPage } from '../tasks/TasksPage.jsx';
 import { DashboardOverview } from './DashboardOverview.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import './Dashboard.css';
@@ -17,6 +18,7 @@ const PAGES = {
   '/': { id: 'dashboard', title: 'Dashboard' },
   '/customers': { id: 'customers', title: 'Customers' },
   '/orders': { id: 'orders', title: 'Orders' },
+  '/tasks': { id: 'tasks', title: 'Tasks' },
 };
 
 // The signed-in app frame for one organization: sidebar, header and the current page.
@@ -92,6 +94,7 @@ export function Dashboard({ organization, justCreated }) {
         <main id="main-content" className="dashboard__main" tabIndex={-1}>
           {page?.id === 'customers' && <CustomersPage organization={organization} />}
           {page?.id === 'orders' && <OrdersPage organization={organization} />}
+          {page?.id === 'tasks' && <TasksPage organization={organization} />}
           {(!page || page.id === 'dashboard') && (
             <DashboardOverview organization={organization} justCreated={justCreated} />
           )}

@@ -4,6 +4,7 @@ import { startServer } from './startServer.js';
 import { captureLogger } from './testing/captureLogger.js';
 import { createMemoryCustomerStore } from './testing/memoryCustomerStore.js';
 import { createMemoryOrderStore } from './testing/memoryOrderStore.js';
+import { createMemoryTaskStore } from './testing/memoryTaskStore.js';
 import { createMemoryOrganizationStores } from './testing/memoryOrganizationStores.js';
 import { createMemoryUserStore } from './testing/memoryUserStore.js';
 import { signUp } from './testing/signUp.js';
@@ -50,6 +51,7 @@ function start(uri, { database = fakeDatabase(), logger = captureLogger() } = {}
     memberships,
     customers: createMemoryCustomerStore(),
     orders: createMemoryOrderStore(),
+    tasks: createMemoryTaskStore(),
   });
 }
 
@@ -139,6 +141,22 @@ describe('startServer with a database', () => {
     await shutdown('SIGTERM');
   });
 
+  it('enables task routes for organization members', async () => {
+    const { server, shutdown } = await start(DATABASE_URI);
+    const { cookie } = await signUp(server, { origin: CLIENT_ORIGIN });
+    const created = await request(server)
+      .post('/api/v1/organizations')
+      .set('Origin', CLIENT_ORIGIN)
+      .set('Cookie', cookie)
+      .send({ name: 'Acme', slug: 'acme' });
+
+    const response = await request(server).get(`/api/v1/organizations/${created.body.organization.id}/tasks`).set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ tasks: [] });
+    await shutdown('SIGTERM');
+  });
+
   it('does not start listening when the database connection fails', async () => {
     const database = fakeDatabase();
     database.connect.mockRejectedValue(new Error('connection refused'));
@@ -205,6 +223,10 @@ describe('startServer without a database', () => {
     const orders = await request(server).get(`/api/v1/organizations/${'a'.repeat(24)}/orders`);
     expect(orders.status).toBe(503);
     expect(orders.body.error.code).toBe('AUTH_UNAVAILABLE');
+
+    const tasks = await request(server).get(`/api/v1/organizations/${'a'.repeat(24)}/tasks`);
+    expect(tasks.status).toBe(503);
+    expect(tasks.body.error.code).toBe('AUTH_UNAVAILABLE');
 
     await shutdown('SIGTERM');
     expect(database.disconnect).not.toHaveBeenCalled();

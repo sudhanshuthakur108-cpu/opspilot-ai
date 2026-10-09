@@ -20,6 +20,13 @@ const PAGE_CARDS = [
     text: 'Record what your customers have ordered and track each order’s status.',
     linkText: 'View orders',
   },
+  {
+    href: '/tasks',
+    title: 'Tasks',
+    icon: 'tasks',
+    text: 'Track the work your team needs to do, for a customer or order or on its own.',
+    linkText: 'View tasks',
+  },
 ];
 
 export function DashboardOverview({ organization, justCreated }) {
@@ -40,8 +47,8 @@ export function DashboardOverview({ organization, justCreated }) {
           {justCreated ? 'Welcome' : 'Welcome back'}, {greetingName}
         </h2>
         <p className="lead">
-          This is the home for <strong className="overview__organization">{organization.name}</strong>. Add your
-          customers, then record their orders; tasks are coming next.
+          This is the home for <strong className="overview__organization">{organization.name}</strong>. Keep track
+          of your customers, their orders and the work your team does for them.
         </p>
       </div>
 
@@ -64,16 +71,6 @@ export function DashboardOverview({ organization, justCreated }) {
               </Link>
             </li>
           ))}
-
-          <li className="overview-card">
-            <h3 className="overview-card__title">
-              <span className="overview-card__icon">
-                <Icon name="tasks" />
-              </span>
-              Tasks
-            </h3>
-            <EmptyState title="No tasks yet" description="Tasks will appear here once you create your first one." />
-          </li>
 
           <li className="overview-card overview-card--upcoming">
             <div className="overview-card__header">

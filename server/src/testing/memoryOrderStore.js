@@ -20,6 +20,15 @@ export function createMemoryOrderStore() {
       return toOrder(record);
     },
 
+    async findById(organizationId, orderId) {
+      const record = records.find((candidate) => candidate.id === orderId && candidate.organizationId === organizationId);
+      return record ? toOrder(record) : null;
+    },
+
+    async findByIds(organizationId, ids) {
+      return records.filter((record) => record.organizationId === organizationId && ids.includes(record.id)).map(toOrder);
+    },
+
     async listForOrganization(organizationId, { limit }) {
       return records
         .filter((record) => record.organizationId === organizationId)

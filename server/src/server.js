@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { redactConnectionStrings } from './lib/redact.js';
 import { customerStore } from './modules/customers/customer.store.js';
 import { orderStore } from './modules/orders/order.store.js';
+import { taskStore } from './modules/tasks/task.store.js';
 import { membershipStore } from './modules/organizations/membership.store.js';
 import { organizationStore } from './modules/organizations/organization.store.js';
 import { userStore } from './modules/users/user.store.js';
@@ -35,6 +36,7 @@ try {
     memberships: membershipStore,
     customers: customerStore,
     orders: orderStore,
+    tasks: taskStore,
   }));
 } catch (error) {
   logger.error('startup failed', { error: errorFields(error) });
