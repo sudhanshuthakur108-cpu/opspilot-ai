@@ -28,8 +28,18 @@
   padding: var(--space-4) var(--space-5);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
   overflow-wrap: anywhere;
+}
+
+/* A waiting proposal is marked along its edge; decided ones stay quiet. */
+.approval-card:has(.approval-status--pending) {
+  border-left: 3px solid var(--color-warning);
+}
+
+.approval-card[aria-busy='true'] {
+  opacity: 0.85;
 }
 
 .approval-card__header {
@@ -47,14 +57,19 @@
 }
 
 .approval-card__source {
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-2xs);
   font-weight: 600;
-  color: var(--color-primary);
+  letter-spacing: 0.02em;
+  color: var(--color-primary-text);
 }
 
 .approval-card__title {
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .approval-card__subject {
@@ -67,7 +82,7 @@
   font-size: var(--text-sm);
   font-style: italic;
   color: var(--color-text-muted);
-  border-left: 3px solid var(--color-border-strong);
+  border-left: 2px solid var(--color-primary-border);
 }
 
 .approval-details {
@@ -137,83 +152,84 @@
   color: var(--color-text-muted);
 }
 
-/* The label carries the meaning; the color only reinforces it. */
-.approval-status {
-  display: inline-block;
-  flex-shrink: 0;
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.375rem;
-  white-space: nowrap;
-  border-radius: 999px;
+/* AI proposes → a person decides → OpsPilot makes the change. */
+.approvals-flow__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
-.approval-status--pending,
-.approval-status--approved {
+.approvals-flow__step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.approvals-flow__step + .approvals-flow__step {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.approvals-flow__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.approvals-flow__step:nth-child(2) .approvals-flow__icon {
   color: var(--color-warning);
   background: var(--color-warning-soft);
 }
 
-.approval-status--executed {
+.approvals-flow__step:nth-child(3) .approvals-flow__icon {
   color: var(--color-success);
   background: var(--color-success-soft);
 }
 
-.approval-status--rejected {
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted);
-  box-shadow: inset 0 0 0 1px var(--color-border);
-}
-
-.approval-status--execution_failed {
-  color: var(--color-danger-text);
-  background: var(--color-danger-soft);
-}
-
-.approvals-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: approval-step;
-}
-
-.approvals-steps__item {
-  display: grid;
-  align-content: start;
-  gap: var(--space-1);
-  padding: var(--space-4);
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  counter-increment: approval-step;
-}
-
-.approvals-steps__item::before {
-  content: counter(approval-step);
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-bottom: var(--space-2);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
-  border-radius: 50%;
-}
-
-.approvals-steps__title {
+.approvals-flow__title {
+  display: block;
   font-size: var(--text-sm);
   font-weight: 600;
 }
 
-.approvals-steps__text {
-  font-size: var(--text-sm);
+.approvals-flow__text {
+  display: block;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+.approval-skeleton {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.approval-skeleton__block {
+  height: 4.5rem;
+}
+
+@media (max-width: 860px) {
+  .approvals-flow__steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .approvals-flow__step + .approvals-flow__step {
+    border-top: 1px solid var(--color-border-subtle);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 767.98px) {

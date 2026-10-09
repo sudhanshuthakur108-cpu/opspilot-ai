@@ -1,48 +1,121 @@
 .auth-page {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
-  padding: var(--space-8) var(--space-4) var(--space-5);
-  background:
-    radial-gradient(70rem 32rem at 50% -12rem, rgb(51 70 211 / 0.1), transparent 70%),
-    var(--color-bg);
+  background: var(--color-bg);
 }
 
-/* A faint dot grid that fades out toward the edges. */
-.auth-page::before {
+/* The product panel, shown beside the form on wide screens. */
+.auth-aside {
+  position: relative;
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-7);
+  padding: var(--space-7);
+  overflow: hidden;
+  background:
+    radial-gradient(40rem 28rem at 0% 0%, var(--color-primary-soft), transparent 70%),
+    var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+/* A faint grid that fades toward the bottom. */
+.auth-aside::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgb(16 24 40 / 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(48rem 30rem at 50% 18rem, #000, transparent);
+  background-image:
+    linear-gradient(var(--color-border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.7), transparent 75%);
   pointer-events: none;
 }
 
-.auth-page__main {
+.auth-aside > * {
   position: relative;
+}
+
+.auth-aside__body {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 30rem;
+}
+
+.auth-aside__title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.auth-aside__list {
+  display: grid;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-aside__item {
   display: flex;
-  flex: 1;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.auth-aside__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-primary-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.auth-aside__item-title {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.auth-aside__item-text {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.auth-aside__footer {
+  font-size: var(--text-2xs);
+  color: var(--color-text-subtle);
+}
+
+.auth-page__main {
+  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
+  gap: var(--space-6);
+  min-width: 0;
+  padding: var(--space-5) var(--space-4) var(--space-6);
 }
 
-.auth-page__brand {
-  margin-bottom: var(--space-6);
+.auth-page__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 400px;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
-  padding: var(--space-7);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  max-width: 400px;
 }
 
 .auth-card__header {
@@ -50,11 +123,11 @@
 }
 
 .auth-card__title {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
   font-size: var(--text-2xl);
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .auth-card__lead {
@@ -67,7 +140,7 @@
 
 .auth-form__fields {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -75,7 +148,7 @@
 }
 
 .auth-form__fields .button {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
 }
 
 .auth-card__switch {
@@ -88,21 +161,39 @@
 }
 
 .auth-page__footer {
-  position: relative;
-  margin-top: var(--space-6);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--color-text-subtle);
 }
 
-@media (max-width: 480px) {
+@media (min-width: 960px) {
   .auth-page {
-    padding-top: var(--space-6);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
   }
 
-  .auth-card {
-    padding: var(--space-6) var(--space-5);
+  .auth-aside {
+    display: flex;
   }
 
+  .auth-page__main {
+    position: relative;
+  }
+
+  /* The panel already shows the brand and footer. */
+  .auth-page__brand,
+  .auth-page__footer {
+    display: none;
+  }
+
+  .auth-page__top {
+    position: absolute;
+    top: var(--space-5);
+    right: var(--space-5);
+    justify-content: flex-end;
+    width: auto;
+  }
+}
+
+@media (max-width: 480px) {
   .auth-card__title {
     font-size: var(--text-xl);
   }

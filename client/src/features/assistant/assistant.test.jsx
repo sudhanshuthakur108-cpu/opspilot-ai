@@ -40,11 +40,21 @@ const sendButton = () => screen.getByRole('button', { name: /^Send/ });
 const responsePanel = () => within(screen.getByRole('region', { name: 'Response' }));
 
 // Signs in on the dashboard, then follows the sidebar link, as a user would.
-async function openAssistant(handlers = {}) {
+async function openAssistantFromSidebar(handlers = {}) {
   const fetchMock = mockServer(handlers);
   render(<App />);
   await screen.findByRole('heading', { name: 'Dashboard' });
   fireEvent.click(within(navigation()).getByRole('link', { name: 'AI Assistant' }));
+  await screen.findByRole('heading', { level: 1, name: 'AI Assistant' });
+  return fetchMock;
+}
+
+// Loads the page at its own address, so only this page's requests are made (the dashboard
+// loads workspace data of its own).
+async function openAssistant(handlers = {}) {
+  const fetchMock = mockServer(handlers);
+  window.history.replaceState(null, '', '/assistant');
+  render(<App />);
   await screen.findByRole('heading', { level: 1, name: 'AI Assistant' });
   return fetchMock;
 }
@@ -68,7 +78,7 @@ afterEach(() => {
 
 describe('AI Assistant navigation', () => {
   it('opens from the sidebar as the current page, and Back returns to the dashboard', async () => {
-    await openAssistant();
+    await openAssistantFromSidebar();
 
     expect(window.location.pathname).toBe('/assistant');
     expect(within(navigation()).getByRole('link', { name: 'AI Assistant' }).getAttribute('aria-current')).toBe('page');
@@ -366,7 +376,7 @@ describe('AI Assistant proposals', () => {
     send('Create two tasks');
 
     await screen.findByRole('group', { name: 'Approval required' });
-    expect(proposals().getAllByRole('listitem')).toHaveLength(2);
+    expect(within(proposals().getByRole('list', { name: 'Proposed changes' })).getAllByRole('listitem')).toHaveLength(2);
     expect(proposals().getByText(/proposed 2 changes/)).toBeTruthy();
     expect(proposals().getByRole('link', { name: 'Review approvals' })).toBeTruthy();
   });

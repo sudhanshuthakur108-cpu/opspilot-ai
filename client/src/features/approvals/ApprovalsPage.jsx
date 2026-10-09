@@ -3,7 +3,9 @@ import { approveApproval, listApprovals, rejectApproval } from '../../api/approv
 import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
+import { Icon } from '../../components/Icon.jsx';
 import { Link } from '../../components/Link.jsx';
+import { LoadFailure } from '../../components/RecordStates.jsx';
 import { canManageWorkspace } from '../organizations/roles.js';
 import { ApprovalCard } from './ApprovalCard.jsx';
 import '../../styles/records.css';
@@ -15,19 +17,26 @@ const PENDING_LIMIT = 50;
 const RECENT_LIMIT = 20;
 
 const STEPS = [
-  {
-    title: 'The AI Assistant proposes a change',
-    text: 'For example, a new task for an order. The proposal is saved here and nothing is changed yet.',
-  },
-  {
-    title: 'An owner or admin reviews it',
-    text: 'They see exactly what would be created, then approve or reject it.',
-  },
-  {
-    title: 'Only approved changes are made',
-    text: 'The server checks the stored proposal again, makes the change and records each step in the audit log.',
-  },
+  { icon: 'assistant', title: 'AI proposes', text: 'A proposed change is saved here. Nothing changes yet.' },
+  { icon: 'user', title: 'A person decides', text: 'An owner or admin reviews exactly what would be created.' },
+  { icon: 'check', title: 'OpsPilot makes the change', text: 'Only after approval, checked again and recorded in the audit log.' },
 ];
+
+// Placeholder cards while the lists load. Only one carries the announced label.
+function CardSkeleton({ label }) {
+  return (
+    <div className="approval-skeleton">
+      <span className="skeleton" style={{ width: '30%' }} aria-hidden="true" />
+      <span className="skeleton" style={{ width: '55%' }} aria-hidden="true" />
+      <span className="skeleton approval-skeleton__block" aria-hidden="true" />
+      {label && (
+        <span role="status" className="visually-hidden">
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function describeReviewError(error, verb) {
   if (error.code === 'APPROVAL_ALREADY_REVIEWED') {
@@ -147,24 +156,13 @@ export function ApprovalsPage({ organization }) {
   }
 
   let waiting;
-  let reviewed = null;
+  let reviewed;
   if (loadError) {
-    waiting = (
-      <div className="records__state" role="alert">
-        <p className="records__state-title">We couldn’t load approvals</p>
-        <p className="records__state-text">{loadError}</p>
-        <button type="button" className="button button--secondary button--small" onClick={retry}>
-          Try again
-        </button>
-      </div>
-    );
+    waiting = <LoadFailure title="We couldn’t load approvals" message={loadError} onRetry={retry} />;
+    reviewed = null;
   } else if (!lists) {
-    waiting = (
-      <div className="records__state records__state--loading">
-        <span className="spinner" aria-hidden="true" />
-        <span role="status">Loading approvals…</span>
-      </div>
-    );
+    waiting = <CardSkeleton label="Loading approvals…" />;
+    reviewed = <CardSkeleton />;
   } else {
     waiting =
       lists.pending.length === 0 ? (
@@ -220,6 +218,28 @@ export function ApprovalsPage({ organization }) {
         </p>
       </div>
 
+      <section className="approvals-flow" aria-labelledby="approvals-how-title">
+        <h2 id="approvals-how-title" className="visually-hidden">
+          How approvals work
+        </h2>
+        <ol className="approvals-flow__steps">
+          {STEPS.map((step, index) => (
+            <li key={step.title} className="approvals-flow__step">
+              <span className="approvals-flow__icon" aria-hidden="true">
+                <Icon name={step.icon} size={18} />
+              </span>
+              <span>
+                <span className="approvals-flow__title">
+                  <span className="visually-hidden">Step {index + 1}: </span>
+                  {step.title}
+                </span>
+                <span className="approvals-flow__text">{step.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
       {notice && (
         <div
           ref={noticeRef}
@@ -231,22 +251,27 @@ export function ApprovalsPage({ organization }) {
           {notice.link && (
             <>
               {' '}
-              <Link href="/tasks">View tasks</Link>
+              <Link className="text-link" href="/tasks">
+                View tasks
+              </Link>
             </>
           )}
         </div>
       )}
 
       {!canReview && (
-        <p className="alert approvals__role-note">
+        <p className="alert alert--info approvals__role-note">
           Only owners and admins can approve or reject proposals. You can see what is waiting and what was decided.
         </p>
       )}
 
       <section className="records__panel" aria-labelledby="approvals-waiting-title">
-        <h2 id="approvals-waiting-title" className="records__panel-title">
-          Waiting for approval
-        </h2>
+        <div className="records__panel-title">
+          <h2 id="approvals-waiting-title">Waiting for approval</h2>
+          {lists && lists.pending.length > 0 && (
+            <span className="records__count">{lists.morePending ? `${lists.pending.length}+` : lists.pending.length}</span>
+          )}
+        </div>
         {waiting}
       </section>
 
@@ -258,20 +283,6 @@ export function ApprovalsPage({ organization }) {
           {reviewed}
         </section>
       )}
-
-      <section className="records__panel" aria-labelledby="approvals-how-title">
-        <h2 id="approvals-how-title" className="records__panel-title">
-          How approvals work
-        </h2>
-        <ol className="approvals-steps">
-          {STEPS.map((step) => (
-            <li key={step.title} className="approvals-steps__item">
-              <p className="approvals-steps__title">{step.title}</p>
-              <p className="approvals-steps__text">{step.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
     </div>
   );
 }

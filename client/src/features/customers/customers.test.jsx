@@ -32,11 +32,21 @@ function mockServer(handlers) {
 const navigation = () => screen.getByRole('navigation', { name: 'Main' });
 
 // Signs in on the dashboard, then follows the sidebar link, as a user would.
-async function openCustomers(handlers = {}) {
+async function openCustomersFromSidebar(handlers = {}) {
   const fetchMock = mockServer(handlers);
   render(<App />);
   await screen.findByRole('heading', { name: 'Dashboard' });
   fireEvent.click(within(navigation()).getByRole('link', { name: 'Customers' }));
+  await screen.findByRole('heading', { level: 1, name: 'Customers' });
+  return fetchMock;
+}
+
+// Loads the page at its own address, so only this page's requests are made (the dashboard
+// loads workspace data of its own).
+async function openCustomers(handlers = {}) {
+  const fetchMock = mockServer(handlers);
+  window.history.replaceState(null, '', '/customers');
+  render(<App />);
   await screen.findByRole('heading', { level: 1, name: 'Customers' });
   return fetchMock;
 }
@@ -71,7 +81,7 @@ afterEach(() => {
 
 describe('Customers navigation', () => {
   it('opens from the sidebar as the current page, and the dashboard is still one click away', async () => {
-    await openCustomers();
+    await openCustomersFromSidebar();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Customers' })).toBeTruthy();
     expect(window.location.pathname).toBe('/customers');
@@ -86,12 +96,12 @@ describe('Customers navigation', () => {
     expect(window.location.pathname).toBe('/');
   });
 
-  it('opens from the dashboard’s Customers card', async () => {
+  it('opens from the dashboard’s Customers figure', async () => {
     mockServer();
     render(<App />);
     await screen.findByRole('heading', { name: 'Dashboard' });
 
-    fireEvent.click(screen.getByRole('link', { name: 'View customers' }));
+    fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: /^Customers/ }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Customers' })).toBeTruthy();
   });

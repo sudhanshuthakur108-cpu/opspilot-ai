@@ -57,7 +57,9 @@ function Outcome({ approval }) {
     return (
       <p className="approval-card__outcome">
         Approved by {reviewer} on <Time value={approval.reviewedAt} />. The task was created.{' '}
-        <Link href="/tasks">View tasks</Link>
+        <Link className="text-link" href="/tasks">
+          View tasks
+        </Link>
       </p>
     );
   }

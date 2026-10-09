@@ -27,33 +27,6 @@
   white-space: nowrap;
 }
 
-/* The label carries the meaning; the color only reinforces it. */
-.task-priority {
-  display: inline-block;
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.375rem;
-  white-space: nowrap;
-  border-radius: 999px;
-}
-
-.task-priority--low {
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted);
-  box-shadow: inset 0 0 0 1px var(--color-border);
-}
-
-.task-priority--medium {
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
-}
-
-.task-priority--high {
-  color: var(--color-warning);
-  background: var(--color-warning-soft);
-}
-
 .task-status {
   display: inline-flex;
   align-items: center;
@@ -61,23 +34,24 @@
 }
 
 .task-status__select {
-  height: 32px;
+  height: var(--control-height-sm);
   padding: 0 2rem 0 0.625rem;
   font: inherit;
   font-size: var(--text-sm);
   color: var(--color-text);
   appearance: none;
   /* The same chevron as .field__select. */
-  background: var(--color-surface)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m6 8 4 4 4-4' fill='none' stroke='%23545e71' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    no-repeat right 0.5rem center / 1rem;
+  background: var(--color-surface) var(--icon-chevron) no-repeat right 0.5rem center / 1rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
   cursor: pointer;
 }
 
 .task-status__select:hover:not(:disabled) {
-  border-color: #b4bbc8;
+  border-color: var(--color-text-subtle);
 }
 
 .task-status__select:focus-visible {
@@ -93,7 +67,7 @@
 }
 
 .task-status__spinner {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 .task-form__row {

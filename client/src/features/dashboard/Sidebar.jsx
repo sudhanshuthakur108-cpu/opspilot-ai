@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../../auth/authContext.js';
+import { initial } from '../../auth/displayName.js';
 import { Brand } from '../../components/Brand.jsx';
 import { Icon } from '../../components/Icon.jsx';
 import { Link } from '../../components/Link.jsx';
@@ -79,11 +80,24 @@ export function Sidebar({ id, organization, currentPage, open, onClose }) {
         })}
       </nav>
 
-      {/* Only shown in the drawer: small screens have no room for the email in the header. */}
-      <p className="sidebar__account">
-        <span className="sidebar__account-label">Signed in as</span>
-        <span className="sidebar__account-email">{user.email}</span>
+      <p className="sidebar__footer">
+        <strong>
+          <Icon name="approvals" size={16} />
+          Human approval on
+        </strong>
+        AI proposals change nothing until an owner or admin approves them.
       </p>
+
+      {/* Only shown in the drawer: small screens have no room for the account in the header. */}
+      <div className="sidebar__account">
+        <span className="sidebar__account-avatar" aria-hidden="true">
+          {initial(user)}
+        </span>
+        <p className="sidebar__account-details">
+          <span className="sidebar__account-label">Signed in as</span>
+          <span className="sidebar__account-email">{user.email}</span>
+        </p>
+      </div>
     </div>
   );
 }

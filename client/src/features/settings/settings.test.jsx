@@ -24,11 +24,21 @@ const saveButton = () => screen.getByRole('button', { name: /^Sav/ });
 const aboutPanel = () => within(screen.getByRole('region', { name: 'About this workspace' }));
 
 // Signs in on the dashboard, then follows the sidebar link, as a user would.
-async function openSettings(options) {
+async function openSettingsFromSidebar(options) {
   const fetchMock = mockServer(options);
   render(<App />);
   await screen.findByRole('heading', { name: 'Dashboard' });
   fireEvent.click(within(navigation()).getByRole('link', { name: 'Settings' }));
+  await screen.findByRole('heading', { level: 1, name: 'Settings' });
+  return fetchMock;
+}
+
+// Loads the page at its own address, so only this page's requests are made (the dashboard
+// loads workspace data of its own).
+async function openSettings(options) {
+  const fetchMock = mockServer(options);
+  window.history.replaceState(null, '', '/settings');
+  render(<App />);
   await screen.findByRole('heading', { level: 1, name: 'Settings' });
   return fetchMock;
 }
@@ -52,7 +62,7 @@ afterEach(() => {
 
 describe('Settings navigation', () => {
   it('opens from the sidebar as the current page, and Back returns to the dashboard', async () => {
-    await openSettings();
+    await openSettingsFromSidebar();
 
     expect(window.location.pathname).toBe('/settings');
     expect(within(navigation()).getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe('page');

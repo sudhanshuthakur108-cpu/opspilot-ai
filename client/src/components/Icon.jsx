@@ -1,4 +1,4 @@
-// 24×24 outline icons, drawn with the current text color.
+// 24×24 outline icons in one style (1.75 stroke, round joins), drawn with the current text color.
 const PATHS = {
   dashboard: 'M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z',
   customers:
@@ -14,19 +14,27 @@ const PATHS = {
   menu: 'M4 7h16M4 12h16M4 17h16',
   close: 'M6.5 6.5l11 11M17.5 6.5l-11 11',
   plus: 'M12 5.5v13M5.5 12h13',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM12 3v1.5M12 19.5V21M4.6 4.6l1.1 1.1M18.3 18.3l1.1 1.1M3 12h1.5M19.5 12H21M4.6 19.4l1.1-1.1M18.3 5.7l1.1-1.1',
+  moon: 'M19.5 14.25A7.5 7.5 0 0 1 9.75 4.5a7.5 7.5 0 1 0 9.75 9.75Z',
+  monitor: 'M4.5 5h15a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM9 20h6M12 16.5V20',
+  search: 'M10.75 17.5a6.75 6.75 0 1 0 0-13.5 6.75 6.75 0 0 0 0 13.5ZM20 20l-4.5-4.5',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  chevronRight: 'M9.5 6l6 6-6 6',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  alert: 'M12 9v4M12 16.5v.01M10.3 4.3 3.1 17a2 2 0 0 0 1.7 3h14.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v5.5M12 7.75v.01',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7.5V12l3 2',
+  user: 'M18.5 20v-1.5a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4V20M12 11.5a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z',
+  logout: 'M14.5 4.5h3a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-3M10 16.5 5.5 12 10 7.5M5.5 12H15',
+  send: 'M4.5 12h7.5M4.5 12 3 4.5 20.5 12 3 19.5z',
+  eye: 'M2.75 12S6 5.5 12 5.5 21.25 12 21.25 12 18 18.5 12 18.5 2.75 12 2.75 12ZM12 14.75a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z',
+  building: 'M4 20V8.5L12 4l8 4.5V20M9 20v-5.5h6V20M3 20h18',
 };
 
 export function Icon({ name, size = 20 }) {
   return (
     <svg className="icon" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
-      <path
-        d={PATHS[name]}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d={PATHS[name]} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

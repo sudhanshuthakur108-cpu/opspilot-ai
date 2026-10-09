@@ -1,16 +1,57 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
-import { json, mockApi } from '../../testing/mockApi.js';
+import { apiError, json, mockApi, requestsTo } from '../../testing/mockApi.js';
 
 const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
 const ACME = { id: 'b'.repeat(24), name: 'Acme Logistics', slug: 'acme-logistics', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 const GLOBEX = { id: 'c'.repeat(24), name: 'Globex', slug: 'globex', role: 'member', createdAt: '2026-10-01T09:00:00.000Z' };
+const base = (organization) => `/api/v1/organizations/${organization.id}`;
 
-async function renderDashboard({ organizations = [ACME], ...handlers } = {}) {
+const customer = (n) => ({ id: `cust${n}`, name: `Customer ${n}`, email: null, phone: null, createdAt: '2026-10-08T10:00:00.000Z' });
+const order = (n, status) => ({
+  id: `order${n}`,
+  customerId: 'cust1',
+  customerName: 'Initech',
+  description: `Order ${n}`,
+  status,
+  totalAmount: 1250,
+  currency: 'INR',
+  createdAt: '2026-10-08T10:00:00.000Z',
+});
+const task = (n, overrides) => ({
+  id: `task${n}`,
+  title: `Task ${n}`,
+  description: null,
+  status: 'todo',
+  priority: 'medium',
+  customerId: null,
+  customerName: null,
+  orderId: null,
+  orderDescription: null,
+  dueDate: null,
+  createdAt: '2026-10-08T10:00:00.000Z',
+  updatedAt: '2026-10-08T10:00:00.000Z',
+  ...overrides,
+});
+
+// The dashboard's own requests for `organization`, answering with an empty workspace unless
+// `data` says otherwise.
+function workspaceHandlers(organization, { customers = [], orders = [], tasks = [], approvals = [], auditLogs = [] } = {}) {
+  return {
+    [`GET ${base(organization)}/customers`]: () => json(200, { customers }),
+    [`GET ${base(organization)}/orders`]: () => json(200, { orders }),
+    [`GET ${base(organization)}/tasks`]: () => json(200, { tasks }),
+    [`GET ${base(organization)}/approvals?status=pending&limit=50`]: () => json(200, { approvals, page: 1, limit: 50, hasMore: false }),
+    [`GET ${base(organization)}/audit-logs`]: () => json(200, { auditLogs, page: 1, limit: 25, hasMore: false }),
+  };
+}
+
+async function renderDashboard({ organizations = [ACME], user = USER, data, ...handlers } = {}) {
   const fetchMock = mockApi({
-    'GET /api/v1/auth/me': () => json(200, { user: USER }),
+    'GET /api/v1/auth/me': () => json(200, { user }),
     'GET /api/v1/organizations': () => json(200, { organizations }),
+    ...workspaceHandlers(organizations[0], data),
     ...handlers,
   });
   render(<App />);
@@ -20,6 +61,9 @@ async function renderDashboard({ organizations = [ACME], ...handlers } = {}) {
 
 const navigation = () => screen.getByRole('navigation', { name: 'Main' });
 const menuButton = () => screen.getByRole('button', { name: 'Open navigation' });
+const stats = () => within(screen.getByRole('list', { name: 'Workspace at a glance' }));
+const stat = (label) => stats().getByRole('link', { name: new RegExp(`^${label}`) });
+const panel = (name) => within(screen.getByRole('region', { name }));
 
 beforeEach(() => {
   vi.spyOn(Storage.prototype, 'setItem');
@@ -42,7 +86,27 @@ describe('dashboard', () => {
     expect(header.getByText('Acme Logistics')).toBeTruthy();
     expect(header.getByText(USER.email)).toBeTruthy();
     expect(header.getByRole('button', { name: 'Sign out' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Welcome back, ada' })).toBeTruthy();
+    expect(header.getByRole('button', { name: /Switch to (dark|light) theme/ })).toBeTruthy();
+  });
+
+  it('greets the user by name, never by email address', async () => {
+    await renderDashboard({ user: { ...USER, email: 'ada.lovelace@example.com' } });
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Welcome back, Ada' })).toBeTruthy();
+    expect(within(screen.getByRole('main')).queryByText(/ada\.lovelace@/)).toBeNull();
+  });
+
+  it('uses the account name when the server sends one', async () => {
+    await renderDashboard({ user: { ...USER, name: 'Grace Hopper' } });
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Welcome back, Grace' })).toBeTruthy();
+  });
+
+  it('greets without a name when the email has nothing name-like in it', async () => {
+    await renderDashboard({ user: { ...USER, email: '1234@example.com' } });
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Welcome back' })).toBeTruthy();
+    expect(screen.getByRole('main').textContent).not.toContain('1234');
   });
 
   it('shows the first organization and the user’s role in it when they belong to several', async () => {
@@ -79,50 +143,6 @@ describe('dashboard', () => {
     expect(within(navigation()).queryAllByRole('button')).toHaveLength(0);
   });
 
-  it.each([
-    ['Customers', 'View customers', '/customers', /no customers/i],
-    ['Orders', 'View orders', '/orders', /no orders/i],
-    ['Tasks', 'View tasks', '/tasks', /no tasks/i],
-  ])('points to the %s page instead of claiming it is empty', async (title, linkName, href, emptyClaim) => {
-    await renderDashboard();
-    const card = within(screen.getByRole('main')).getByRole('heading', { level: 3, name: title }).closest('li');
-
-    expect(within(card).queryByText(emptyClaim)).toBeNull();
-    expect(within(card).getByRole('link', { name: linkName }).getAttribute('href')).toBe(href);
-  });
-
-  it('points recent activity to the audit log instead of showing data', async () => {
-    await renderDashboard();
-    const activity = within(screen.getByRole('region', { name: 'Recent activity' }));
-
-    expect(activity.getByText('Activity is kept in the audit log')).toBeTruthy();
-    expect(activity.queryByText('No activity yet')).toBeNull();
-    expect(activity.getByRole('link', { name: 'View audit log' }).getAttribute('href')).toBe('/audit-logs');
-  });
-
-  it('does not offer the audit log to a member, who cannot view it', async () => {
-    await renderDashboard({ organizations: [GLOBEX] });
-    const activity = within(screen.getByRole('region', { name: 'Recent activity' }));
-
-    expect(activity.getByText(/Owners and admins can review them/)).toBeTruthy();
-    expect(activity.queryByRole('link')).toBeNull();
-  });
-
-  it('links to the AI Assistant, saying its changes need approval and without claiming it can change anything', async () => {
-    await renderDashboard();
-
-    const card = within(screen.getByRole('main')).getByRole('heading', { level: 3, name: 'AI Assistant' }).closest('li');
-    expect(within(card).getByText('Changes need approval')).toBeTruthy();
-    expect(card.textContent).toContain('It can read your records and propose new tasks, but it can’t change anything until an owner or admin approves.');
-    expect(within(card).getByRole('link', { name: 'Open AI Assistant' }).getAttribute('href')).toBe('/assistant');
-  });
-
-  it('shows no figures, since there are no records yet', async () => {
-    await renderDashboard();
-
-    expect(screen.getByRole('main').textContent).not.toMatch(/\d/);
-  });
-
   it('identifies the user only by the session cookie and stores nothing in the browser', async () => {
     const fetchMock = await renderDashboard({ 'POST /api/v1/auth/logout': () => new Response(null, { status: 204 }) });
 
@@ -135,6 +155,134 @@ describe('dashboard', () => {
     }
     expect(Storage.prototype.setItem).not.toHaveBeenCalled();
     expect(console.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('dashboard figures', () => {
+  it('counts what the workspace’s APIs return, and nothing else', async () => {
+    await renderDashboard({
+      data: {
+        customers: [customer(1), customer(2)],
+        orders: [order(1, 'pending'), order(2, 'confirmed'), order(3, 'completed')],
+        tasks: [task(1), task(2, { status: 'in_progress', dueDate: '2020-01-01' }), task(3, { status: 'completed' })],
+        approvals: [{ id: 'approval1' }],
+      },
+    });
+
+    await waitFor(() => expect(stat('Customers').textContent).toBe('Customers2In this workspace'));
+    expect(stat('Open orders').textContent).toBe('Open orders2Pending or confirmed');
+    expect(stat('Open tasks').textContent).toBe('Open tasks21 overdue');
+    expect(stat('Awaiting approval').textContent).toBe('Awaiting approval1AI proposals to review');
+    expect(stat('Customers').getAttribute('href')).toBe('/customers');
+    expect(stat('Awaiting approval').getAttribute('href')).toBe('/approvals');
+  });
+
+  it('says a count is at least the number shown when a list is full', async () => {
+    await renderDashboard({ data: { customers: Array.from({ length: 50 }, (_, n) => customer(n)) } });
+
+    await waitFor(() => expect(stat('Customers').textContent).toBe('Customers50+Counting the newest 50'));
+  });
+
+  it('shows an empty workspace as empty, with a checklist built from its real records', async () => {
+    await renderDashboard({ data: { customers: [customer(1)] } });
+
+    const setup = within(await screen.findByRole('region', { name: 'Set up your workspace' }));
+    expect(setup.getByText('1 of 3 done')).toBeTruthy();
+    expect(setup.getByRole('link', { name: 'Add a customer' }).getAttribute('href')).toBe('/customers');
+    expect(setup.getByRole('link', { name: 'Record an order' }).getAttribute('href')).toBe('/orders');
+    expect(panel('Tasks needing attention').getByText('No tasks yet')).toBeTruthy();
+    expect(panel('Recent orders').getByText('No orders yet')).toBeTruthy();
+    expect(stat('Open orders').textContent).toContain('0');
+  });
+
+  it('keeps the other sections when one fails to load, and retries', async () => {
+    let attempts = 0;
+    await renderDashboard({
+      [`GET ${base(ACME)}/orders`]: () => (++attempts === 1 ? apiError(500, 'INTERNAL_ERROR') : json(200, { orders: [order(1, 'pending')] })),
+    });
+
+    expect(await panel('Recent orders').findByText('We couldn’t load orders')).toBeTruthy();
+    expect(stat('Open orders').textContent).toContain('Unavailable');
+    expect(stat('Customers').textContent).toBe('Customers0In this workspace');
+
+    fireEvent.click(panel('Recent orders').getByRole('button', { name: 'Try again' }));
+
+    expect(await panel('Recent orders').findByText('Order 1')).toBeTruthy();
+  });
+});
+
+describe('dashboard sections', () => {
+  it('lists open tasks with the most urgent first, leaving out completed ones', async () => {
+    await renderDashboard({
+      data: {
+        tasks: [
+          task(1, { title: 'No due date', priority: 'high' }),
+          task(2, { title: 'Overdue', dueDate: '2020-01-01', customerName: 'Initech' }),
+          task(3, { title: 'Later', dueDate: '2999-01-01' }),
+          task(4, { title: 'Done already', status: 'completed', dueDate: '2019-01-01' }),
+        ],
+      },
+    });
+
+    const items = await panel('Tasks needing attention').findAllByRole('listitem');
+    expect(items.map((item) => item.querySelector('.overview-list__title').textContent)).toEqual(['Overdue', 'Later', 'No due date']);
+    expect(items[0].textContent).toContain('Initech');
+    expect(items[0].textContent).toMatch(/Overdue ·/);
+    expect(panel('Tasks needing attention').getByRole('link', { name: 'All tasks' }).getAttribute('href')).toBe('/tasks');
+  });
+
+  it('shows the newest orders with their status and amount', async () => {
+    await renderDashboard({ data: { orders: [order(1, 'pending')] } });
+
+    const [item] = await panel('Recent orders').findAllByRole('listitem');
+    expect(item.textContent).toContain('Order 1');
+    expect(item.textContent).toContain('Initech');
+    expect(item.textContent).toContain('Pending');
+    expect(item.textContent).toMatch(/1,250/);
+  });
+
+  it('shows an owner the latest audit log entries', async () => {
+    await renderDashboard({
+      data: {
+        auditLogs: [
+          {
+            id: 'log1',
+            actorType: 'ai',
+            actorEmail: null,
+            action: 'approval.proposed',
+            resourceType: 'approval',
+            resourceId: 'x',
+            details: {},
+            createdAt: '2026-10-09T10:15:00.000Z',
+          },
+        ],
+      },
+    });
+
+    const activity = panel('Recent activity');
+    expect(await activity.findByText('Change proposed')).toBeTruthy();
+    expect(activity.getByText(/AI Assistant/)).toBeTruthy();
+    expect(activity.getByRole('link', { name: 'View audit log' }).getAttribute('href')).toBe('/audit-logs');
+  });
+
+  it('does not offer or request the audit log for a member, who cannot view it', async () => {
+    const fetchMock = await renderDashboard({ organizations: [GLOBEX] });
+    const activity = panel('Recent activity');
+
+    expect(activity.getByText(/Owners and admins can review them/)).toBeTruthy();
+    expect(activity.queryByRole('link')).toBeNull();
+    expect(requestsTo(fetchMock, 'GET', `${base(GLOBEX)}/audit-logs`)).toHaveLength(0);
+  });
+
+  it('introduces the AI Assistant without claiming it can change anything, and points to waiting approvals', async () => {
+    await renderDashboard({ data: { approvals: [{ id: 'approval1' }, { id: 'approval2' }] } });
+
+    const assistant = panel('AI Assistant');
+    expect(assistant.getByText('Changes need approval')).toBeTruthy();
+    expect(assistant.getByText(/It can read your records and propose new tasks, but it can’t change anything until an owner or admin approves\./)).toBeTruthy();
+    expect(assistant.getByRole('link', { name: 'Open AI Assistant' }).getAttribute('href')).toBe('/assistant');
+    const pending = await assistant.findByRole('link', { name: /2 proposals are waiting for review/ });
+    expect(pending.getAttribute('href')).toBe('/approvals');
   });
 });
 

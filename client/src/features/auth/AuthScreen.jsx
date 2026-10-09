@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { Brand } from '../../components/Brand.jsx';
+import { Icon } from '../../components/Icon.jsx';
 import { PasswordField, TextField } from '../../components/TextField.jsx';
+import { ThemeToggle } from '../../components/ThemeToggle.jsx';
 import './AuthScreen.css';
 
 // Mirrors the server's rules so obvious mistakes are caught before a request is made.
@@ -13,7 +15,7 @@ const PASSWORD_MAX_LENGTH = 128;
 const COPY = {
   signIn: {
     title: 'Welcome back',
-    lead: 'Sign in to your OpsPilot workspace.',
+    lead: 'Sign in to your OpsPilot AI workspace.',
     submit: 'Sign in',
     submitting: 'Signing in…',
     passwordAutocomplete: 'current-password',
@@ -22,7 +24,7 @@ const COPY = {
   },
   signUp: {
     title: 'Create your account',
-    lead: 'Get started with OpsPilot.',
+    lead: 'Set up a workspace for your team in a minute.',
     submit: 'Create account',
     submitting: 'Creating account…',
     passwordAutocomplete: 'new-password',
@@ -48,6 +50,12 @@ function validate({ email, password }, mode) {
 
   return errors;
 }
+
+const HIGHLIGHTS = [
+  { icon: 'orders', title: 'One place for operations', text: 'Customers, orders and tasks, kept separate for each workspace.' },
+  { icon: 'assistant', title: 'An assistant that knows your records', text: 'Ask questions and get answers from your own data.' },
+  { icon: 'approvals', title: 'People stay in control', text: 'AI proposals change nothing until an owner or admin approves.' },
+];
 
 // Server errors are turned into fixed messages; a sign-in failure never says which of the
 // email or password was wrong.
@@ -122,9 +130,33 @@ export function AuthScreen() {
 
   return (
     <div className="auth-page">
+      <aside className="auth-aside">
+        <Brand />
+        <div className="auth-aside__body">
+          <p className="auth-aside__title">The operations workspace with an AI co-pilot you control.</p>
+          <ul className="auth-aside__list">
+            {HIGHLIGHTS.map((item) => (
+              <li key={item.title} className="auth-aside__item">
+                <span className="auth-aside__icon" aria-hidden="true">
+                  <Icon name={item.icon} size={18} />
+                </span>
+                <span>
+                  <span className="auth-aside__item-title">{item.title}</span>
+                  <span className="auth-aside__item-text">{item.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="auth-aside__footer">© {new Date().getFullYear()} OpsPilot AI</p>
+      </aside>
+
       <main className="auth-page__main">
-        <div className="auth-page__brand">
-          <Brand />
+        <div className="auth-page__top">
+          <span className="auth-page__brand">
+            <Brand />
+          </span>
+          <ThemeToggle />
         </div>
 
         <section className="auth-card" aria-labelledby="auth-title">
@@ -172,7 +204,7 @@ export function AuthScreen() {
                 onChange={updateField}
                 error={fieldErrors.password}
               />
-              <button type="submit" className="button button--primary button--block">
+              <button type="submit" className="button button--primary button--block button--large">
                 {submitting && <span className="spinner" aria-hidden="true" />}
                 {submitting ? copy.submitting : copy.submit}
               </button>
@@ -186,9 +218,9 @@ export function AuthScreen() {
             </button>
           </p>
         </section>
-      </main>
 
-      <footer className="auth-page__footer">© {new Date().getFullYear()} OpsPilot AI</footer>
+        <p className="auth-page__footer">© {new Date().getFullYear()} OpsPilot AI</p>
+      </main>
     </div>
   );
 }

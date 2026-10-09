@@ -3,6 +3,7 @@ import { describeRequestError } from '../../api/errorMessages.js';
 import { createOrganization } from '../../api/organizations.js';
 import { useAuth } from '../../auth/authContext.js';
 import { AppHeader } from '../../components/AppHeader.jsx';
+import { Icon } from '../../components/Icon.jsx';
 import { TextField } from '../../components/TextField.jsx';
 import { toSlug } from './slug.js';
 import './OnboardingScreen.css';
@@ -81,16 +82,7 @@ export function OnboardingScreen({ onCreated }) {
       <main className="app-main app-main--centered">
         <section className="panel onboarding" aria-labelledby="onboarding-title">
           <div className="onboarding__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="22" height="22" focusable="false">
-              <path
-                d="M4 20V8.5L12 4l8 4.5V20M9 20v-5.5h6V20M3 20h18"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Icon name="building" size={22} />
           </div>
 
           <p className="eyebrow">Welcome to OpsPilot</p>
@@ -119,14 +111,23 @@ export function OnboardingScreen({ onCreated }) {
                 hint={slug ? `Workspace address: ${slug}` : 'Your workspace address is created from the name.'}
                 error={nameError}
               />
-              <button type="submit" className="button button--primary button--block">
+              <button type="submit" className="button button--primary button--block button--large">
                 {creating && <span className="spinner" aria-hidden="true" />}
                 {creating ? 'Creating organization…' : 'Create organization'}
               </button>
             </fieldset>
           </form>
 
-          <p className="onboarding__footnote">You’ll be the owner of this workspace.</p>
+          <ul className="onboarding__facts">
+            <li>
+              <Icon name="user" size={16} />
+              You’ll be the owner of this workspace.
+            </li>
+            <li>
+              <Icon name="settings" size={16} />
+              You can rename it later in Settings.
+            </li>
+          </ul>
         </section>
       </main>
     </div>

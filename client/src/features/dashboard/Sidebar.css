@@ -4,10 +4,10 @@
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   height: 100vh;
   height: 100dvh;
-  padding: 0 var(--space-3) var(--space-5);
+  padding: 0 var(--space-3) var(--space-4);
   overflow-y: auto;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
@@ -19,7 +19,7 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  height: var(--header-height);
   margin: 0 calc(-1 * var(--space-3));
   padding: 0 var(--space-5);
   border-bottom: 1px solid var(--color-border);
@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -44,19 +44,25 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   font-size: var(--text-sm);
   font-weight: 700;
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
+  color: var(--color-on-primary);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xs);
 }
 
 .sidebar__workspace-details {
   display: grid;
   min-width: 0;
   line-height: 1.3;
+}
+
+.sidebar__workspace-label {
+  font-size: var(--text-2xs);
+  color: var(--color-text-subtle);
 }
 
 .sidebar__workspace-name {
@@ -68,28 +74,28 @@
 }
 
 .sidebar__workspace-role {
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   color: var(--color-text-muted);
 }
 
 .sidebar__nav {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .sidebar__section-title {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
   padding: 0 var(--space-3);
   font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--color-text-subtle);
 }
 
 .sidebar__list {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -100,28 +106,30 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 var(--space-3);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-muted);
   text-decoration: none;
   border-radius: var(--radius-md);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .sidebar__link .icon {
-  flex-shrink: 0;
-}
-
-a.sidebar__link {
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
+  color: var(--color-text-subtle);
+  transition: color var(--transition-fast);
 }
 
 a.sidebar__link:hover {
   color: var(--color-text);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-hover);
+}
+
+a.sidebar__link:hover .icon {
+  color: var(--color-text-muted);
 }
 
 /* The transparent outline shows up in forced-colors mode, where box shadows are dropped. */
@@ -133,8 +141,12 @@ a.sidebar__link:focus-visible {
 /* `a` keeps this ahead of the hover style, so the current page looks the same under the pointer. */
 a.sidebar__link[aria-current='page'] {
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   background: var(--color-primary-soft);
+}
+
+a.sidebar__link[aria-current='page'] .icon {
+  color: var(--color-primary-text);
 }
 
 /* A bar at the sidebar's edge marks the current page without relying on color alone. */
@@ -157,6 +169,24 @@ a.sidebar__link[aria-current='page'] {
   text-overflow: ellipsis;
 }
 
+.sidebar__footer {
+  margin-top: auto;
+  padding: var(--space-3);
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+  color: var(--color-text-subtle);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.sidebar__footer strong {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
 .sidebar__account {
   display: none;
 }
@@ -165,13 +195,13 @@ a.sidebar__link[aria-current='page'] {
 @media (min-width: 768px) and (max-width: 1079.98px) {
   .sidebar {
     align-items: center;
-    padding: 0 var(--space-4) var(--space-5);
+    padding: 0 var(--space-3) var(--space-4);
   }
 
   .sidebar__top {
     align-self: stretch;
     justify-content: center;
-    margin: 0 calc(-1 * var(--space-4));
+    margin: 0 calc(-1 * var(--space-3));
     padding: 0;
   }
 
@@ -189,26 +219,32 @@ a.sidebar__link[aria-current='page'] {
 
   .sidebar__workspace {
     padding: var(--space-1);
+    background: none;
+    border-color: transparent;
   }
 
   .sidebar__nav {
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .sidebar__section + .sidebar__section {
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   .sidebar__link {
     justify-content: center;
-    width: 44px;
-    min-height: 44px;
+    width: 40px;
+    min-height: 40px;
     padding: 0;
   }
 
   .sidebar__link[aria-current='page']::before {
-    left: calc(-1 * var(--space-4));
+    left: calc(-1 * var(--space-3) - 2px);
+  }
+
+  .sidebar__footer {
+    display: none;
   }
 }
 
@@ -218,32 +254,60 @@ a.sidebar__link[aria-current='page'] {
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 30;
-    width: min(288px, calc(100vw - 3rem));
-    box-shadow: var(--shadow-card);
+    width: min(296px, calc(100vw - 3rem));
+    background: var(--color-surface-raised);
+    box-shadow: var(--shadow-lg);
     visibility: hidden;
     transform: translateX(-100%);
     transition:
-      transform 0.2s ease,
-      visibility 0s linear 0.2s;
+      transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s linear 0.22s;
   }
 
   .sidebar--open {
     visibility: visible;
     transform: none;
-    transition: transform 0.2s ease;
+    transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .sidebar .sidebar__close {
     display: inline-flex;
   }
 
+  .sidebar__link {
+    min-height: 42px;
+  }
+
+  .sidebar__footer {
+    display: none;
+  }
+
   .sidebar__account {
-    display: grid;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
     margin-top: auto;
     padding: var(--space-4) var(--space-3) 0;
     font-size: var(--text-xs);
     line-height: 1.4;
     border-top: 1px solid var(--color-border);
+  }
+
+  .sidebar__account-avatar {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    font-weight: 700;
+    color: var(--color-primary-text);
+    background: var(--color-primary-soft);
+    border-radius: 50%;
+  }
+
+  .sidebar__account-details {
+    display: grid;
+    min-width: 0;
   }
 
   .sidebar__account-label {
@@ -255,13 +319,5 @@ a.sidebar__link[aria-current='page'] {
     font-weight: 600;
     white-space: nowrap;
     text-overflow: ellipsis;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sidebar,
-  .sidebar--open,
-  a.sidebar__link {
-    transition: none;
   }
 }

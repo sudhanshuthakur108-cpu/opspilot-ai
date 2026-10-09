@@ -1,6 +1,34 @@
+/* Each settings section: what it is on the left, its controls on the right (stacked on small screens). */
+.settings-section {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4) var(--space-6);
+}
+
+@media (min-width: 900px) {
+  .settings-section {
+    grid-template-columns: minmax(12rem, 1fr) minmax(0, 2.2fr);
+    align-items: start;
+  }
+}
+
+.settings-section__intro {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.settings-section__text {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.settings-section__body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
 .settings-form__fields {
   display: grid;
-  max-width: 640px;
   gap: var(--space-4);
   min-width: 0;
   margin: 0;
@@ -10,24 +38,40 @@
 
 .settings-form .field__input:read-only {
   color: var(--color-text-muted);
+  cursor: default;
+}
+
+.settings-form .field__control:has(.field__input:read-only) {
   background: var(--color-surface-muted);
+  box-shadow: none;
 }
 
 .settings-form__actions {
   display: flex;
   justify-content: flex-end;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .settings-details {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   gap: var(--space-4) var(--space-5);
   margin: 0;
 }
 
+.settings-details > div {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
 .settings-details dt {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  margin-bottom: 2px;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--color-text-subtle);
 }
 
 .settings-details dd {
@@ -45,4 +89,132 @@
 .settings-details__note {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* Theme choice */
+
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.theme-option {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.theme-option:hover {
+  border-color: var(--color-text-subtle);
+}
+
+.theme-option:has(input:checked) {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.theme-option:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+/* The radio stays in the accessibility tree; the whole card is its visible control. */
+.theme-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A miniature of each theme: a sidebar strip and a content area. */
+.theme-option__preview {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  gap: 3px;
+  height: 52px;
+  margin-bottom: var(--space-1);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.theme-option__preview span {
+  border-radius: 3px;
+}
+
+.theme-option__preview--light {
+  background: #f5f6f8;
+}
+
+.theme-option__preview--light span {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #e4e7ec;
+}
+
+.theme-option__preview--dark {
+  background: #0b0f17;
+}
+
+.theme-option__preview--dark span {
+  background: #161c27;
+  box-shadow: 0 0 0 1px #252d3a;
+}
+
+/* Half light, half dark. The content area starts a quarter of the way in, so its own split
+   sits a third of the way across it to line up with the background's. */
+.theme-option__preview--system {
+  background: linear-gradient(90deg, #f5f6f8 50%, #0b0f17 50%);
+}
+
+.theme-option__preview--system span:first-child {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #e4e7ec;
+}
+
+.theme-option__preview--system span:last-child {
+  background: linear-gradient(90deg, #ffffff 33%, #161c27 33%);
+}
+
+.theme-option__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.theme-option__hint {
+  padding: 0 var(--space-1);
+  font-size: var(--text-2xs);
+  color: var(--color-text-subtle);
+}
+
+@media (max-width: 480px) {
+  .theme-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .theme-option {
+    grid-template-columns: 4rem minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+    padding: var(--space-2);
+  }
+
+  .theme-option__preview {
+    grid-row: span 2;
+    height: 40px;
+    margin: 0;
+  }
 }

@@ -2,9 +2,15 @@
   white-space: nowrap;
 }
 
-/* Emails wrap only when they do not fit, never mid-word just to narrow the column. */
-.records-table .audit-table__actor {
-  overflow-wrap: break-word;
+.audit-table__time time {
+  display: block;
+  color: var(--color-text);
+}
+
+.audit-table__relative {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--color-text-subtle);
 }
 
 .records-table .audit-table__resource {
@@ -19,14 +25,36 @@
   min-width: 14rem;
 }
 
-/* The label carries the meaning; the color only reinforces it. */
+/* The label carries the meaning; the icon and color only reinforce it. */
 .audit-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-weight: 500;
   color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.audit-actor__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
 }
 
 .audit-actor--ai {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.audit-actor--ai .audit-actor__icon {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
 }
 
 .audit-actor--system {
@@ -44,4 +72,56 @@
 
 .audit-more .alert {
   justify-self: stretch;
+}
+
+/* Small screens: each entry becomes a stacked card instead of a wide table row. */
+@media (max-width: 767.98px) {
+  .records-table:has(.audit-table__action) table {
+    min-width: 0;
+  }
+
+  .records-table:has(.audit-table__action) thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .records-table:has(.audit-table__action) tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .records-table:has(.audit-table__action) tbody tr > * {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .records-table:has(.audit-table__action) .audit-table__action {
+    order: -1;
+  }
+
+  .records-table:has(.audit-table__action) .audit-table__details {
+    min-width: 0;
+  }
+
+  .records-table:has(.audit-table__action) td[data-label]::before {
+    content: attr(data-label) ' · ';
+    font-size: var(--text-2xs);
+    color: var(--color-text-subtle);
+  }
+
+  .audit-table__time time,
+  .audit-table__relative {
+    display: inline;
+  }
+
+  .audit-table__relative::before {
+    content: ' · ';
+  }
 }

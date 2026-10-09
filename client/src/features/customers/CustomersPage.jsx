@@ -4,6 +4,7 @@ import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Icon } from '../../components/Icon.jsx';
+import { ListFilter, LoadFailure, LoadingRows, matchesQuery } from '../../components/RecordStates.jsx';
 import { CustomerTable } from './CustomerTable.jsx';
 import { NewCustomerDialog } from './NewCustomerDialog.jsx';
 import '../../styles/records.css';
@@ -15,6 +16,7 @@ export function CustomersPage({ organization }) {
   const [attempt, setAttempt] = useState(0);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -55,36 +57,27 @@ export function CustomersPage({ organization }) {
     </button>
   );
 
+  const shown = customers?.filter((customer) => matchesQuery(query, customer.name, customer.email, customer.phone)) ?? [];
+
   let content;
   if (loadError) {
-    content = (
-      <div className="records__state" role="alert">
-        <p className="records__state-title">We couldn’t load your customers</p>
-        <p className="records__state-text">{loadError}</p>
-        <button type="button" className="button button--secondary button--small" onClick={retry}>
-          Try again
-        </button>
-      </div>
-    );
+    content = <LoadFailure title="We couldn’t load your customers" message={loadError} onRetry={retry} />;
   } else if (!customers) {
-    content = (
-      <div className="records__state records__state--loading">
-        <span className="spinner" aria-hidden="true" />
-        <span role="status">Loading customers…</span>
-      </div>
-    );
+    content = <LoadingRows label="Loading customers…" />;
   } else if (customers.length === 0) {
     content = (
       <EmptyState
         icon="customers"
         title="No customers yet"
-        description="Add the people and businesses your team works with, and they’ll be listed here."
+        description="Customers are the people and businesses your team works with. Orders and tasks are recorded against them."
       >
         {addButton}
       </EmptyState>
     );
+  } else if (shown.length === 0) {
+    content = <p className="records__no-match">No customers match “{query.trim()}”.</p>;
   } else {
-    content = <CustomerTable customers={customers} labelledBy="customers-list-title" highlightId={added?.id} />;
+    content = <CustomerTable customers={shown} labelledBy="customers-list-title" highlightId={added?.id} />;
   }
 
   return (
@@ -105,9 +98,15 @@ export function CustomersPage({ organization }) {
       </div>
 
       <div className="records__panel">
-        <h2 id="customers-list-title" className="records__panel-title">
-          All customers
-        </h2>
+        <div className="records__panel-header">
+          <div className="records__panel-title">
+            <h2 id="customers-list-title">All customers</h2>
+            {customers && customers.length > 0 && <span className="records__count">{customers.length}</span>}
+          </div>
+          {customers && customers.length > 0 && (
+            <ListFilter id="customers-filter" label="Filter customers" placeholder="Filter customers" value={query} onChange={setQuery} />
+          )}
+        </div>
         {content}
       </div>
 

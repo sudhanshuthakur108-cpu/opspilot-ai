@@ -1,4 +1,4 @@
-/* Shared by the record pages (Customers, Orders): page layout, list panel, states and table. */
+/* Shared by the record pages: page layout, toolbar, list panel, states and table. */
 
 .records {
   display: grid;
@@ -7,7 +7,7 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-7) var(--space-6) var(--space-8);
+  padding: var(--space-6) var(--space-6) var(--space-8);
 }
 
 .records__header {
@@ -15,11 +15,12 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  min-height: 44px;
+  gap: var(--space-3) var(--space-4);
+  min-height: var(--control-height);
 }
 
 .records__intro {
+  max-width: 70ch;
   min-width: 0;
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
@@ -34,18 +35,15 @@
   display: none;
 }
 
-.records__notice strong {
-  font-weight: 600;
-}
-
 .records__panel {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
   padding: var(--space-5);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
 }
 
 /* The table runs edge to edge inside the panel. */
@@ -53,9 +51,73 @@
   padding-bottom: 0;
 }
 
+.records__panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .records__panel-title {
-  font-size: var(--text-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
   font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.records__count {
+  padding: 0 0.45rem;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 1.25rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrows the loaded list; it never asks the server for more. */
+.records__filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(18rem, 100%);
+}
+
+.records__filter .icon {
+  position: absolute;
+  left: 0.625rem;
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+
+.records__filter input {
+  width: 100%;
+  height: var(--control-height-sm);
+  padding: 0 0.75rem 0 2.1rem;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.records__filter input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.records__filter input:focus {
+  border-color: var(--color-primary);
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
 }
 
 .records__panel .empty-state {
@@ -72,15 +134,15 @@
   color: var(--color-text-muted);
 }
 
-.records__state--loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.records__state--loading .spinner {
-  color: var(--color-primary);
+.records__state-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-1);
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
+  border-radius: 50%;
 }
 
 .records__state-title {
@@ -92,13 +154,62 @@
   margin-top: var(--space-2);
 }
 
+.records__no-match {
+  padding: var(--space-6) var(--space-4);
+  font-size: var(--text-sm);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* Skeleton rows shown while a list loads. */
+.records-skeleton {
+  display: grid;
+  margin: 0 calc(-1 * var(--space-5));
+  border-top: 1px solid var(--color-border);
+}
+
+.records-skeleton__row {
+  display: grid;
+  grid-template-columns: 2fr 1.4fr 1fr 0.8fr;
+  gap: var(--space-5);
+  align-items: center;
+  padding: 0.95rem var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.records-skeleton__row:last-of-type {
+  border-bottom: 0;
+}
+
 @media (max-width: 767.98px) {
   .records {
+    gap: var(--space-4);
     padding: var(--space-5) var(--space-4) var(--space-7);
   }
 
   .records__panel {
     padding: var(--space-4);
+  }
+
+  .records__header > .button {
+    width: 100%;
+  }
+
+  .records__filter {
+    width: 100%;
+  }
+
+  .records-skeleton {
+    margin: 0 calc(-1 * var(--space-4));
+  }
+
+  .records-skeleton__row {
+    grid-template-columns: 2fr 1fr;
+    padding-inline: var(--space-4);
+  }
+
+  .records-skeleton__row > :nth-child(n + 3) {
+    display: none;
   }
 }
 
@@ -128,21 +239,29 @@
 
 .records-table th,
 .records-table td {
-  padding: var(--space-3) var(--space-5);
+  padding: 0.7rem var(--space-5);
   text-align: left;
   vertical-align: middle;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .records-table thead th {
-  padding-top: 0.625rem;
-  padding-bottom: 0.625rem;
-  font-size: 0.75rem;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+  color: var(--color-text-subtle);
   background: var(--color-surface-muted);
+  border-bottom-color: var(--color-border);
+}
+
+.records-table tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+.records-table tbody tr:hover {
+  background: var(--color-surface-hover);
 }
 
 .records-table tbody tr:last-child > * {
@@ -151,6 +270,7 @@
 
 .records-table tbody th {
   font-weight: 600;
+  color: var(--color-text);
 }
 
 .records-table td {
@@ -173,12 +293,13 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  font-size: 0.75rem;
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-2xs);
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
   border-radius: 50%;
 }
 
@@ -186,7 +307,7 @@
   color: var(--color-text-subtle);
 }
 
-/* Briefly marks the customer that was just added. */
+/* Briefly marks the record that was just added. */
 .records-table__row--new > * {
   animation: row-added 2.4s ease-out;
 }
@@ -209,8 +330,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .records-table__row--new > * {
-    animation: none;
-  }
+.records__panel-title h2 {
+  font-size: inherit;
+  font-weight: inherit;
 }

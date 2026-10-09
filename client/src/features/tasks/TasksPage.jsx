@@ -4,6 +4,7 @@ import { listTasks, updateTask } from '../../api/tasks.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Icon } from '../../components/Icon.jsx';
+import { ListFilter, LoadFailure, LoadingRows, matchesQuery } from '../../components/RecordStates.jsx';
 import { NewTaskDialog } from './NewTaskDialog.jsx';
 import { TaskTable } from './TaskTable.jsx';
 import { statusLabel } from './taskDisplay.js';
@@ -19,6 +20,7 @@ export function TasksPage({ organization }) {
   const [savingStatus, setSavingStatus] = useState({});
   const [statusError, setStatusError] = useState('');
   const [statusNotice, setStatusNotice] = useState('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -87,38 +89,30 @@ export function TasksPage({ organization }) {
     </button>
   );
 
+  const shown =
+    tasks?.filter((task) => matchesQuery(query, task.title, task.description, task.customerName, task.orderDescription, statusLabel(task.status))) ?? [];
+
   let content;
   if (loadError) {
-    content = (
-      <div className="records__state" role="alert">
-        <p className="records__state-title">We couldn’t load your tasks</p>
-        <p className="records__state-text">{loadError}</p>
-        <button type="button" className="button button--secondary button--small" onClick={retry}>
-          Try again
-        </button>
-      </div>
-    );
+    content = <LoadFailure title="We couldn’t load your tasks" message={loadError} onRetry={retry} />;
   } else if (!tasks) {
-    content = (
-      <div className="records__state records__state--loading">
-        <span className="spinner" aria-hidden="true" />
-        <span role="status">Loading tasks…</span>
-      </div>
-    );
+    content = <LoadingRows label="Loading tasks…" />;
   } else if (tasks.length === 0) {
     content = (
       <EmptyState
         icon="tasks"
         title="No tasks yet"
-        description="Create a task for the work your team needs to do, on its own or for a customer or order."
+        description="Tasks track the work your team does, on their own or for a customer or order. The AI Assistant can also propose them for approval."
       >
         {newTaskButton}
       </EmptyState>
     );
+  } else if (shown.length === 0) {
+    content = <p className="records__no-match">No tasks match “{query.trim()}”.</p>;
   } else {
     content = (
       <TaskTable
-        tasks={tasks}
+        tasks={shown}
         labelledBy="tasks-list-title"
         highlightId={created?.id}
         savingStatus={savingStatus}
@@ -153,9 +147,15 @@ export function TasksPage({ organization }) {
       )}
 
       <div className="records__panel">
-        <h2 id="tasks-list-title" className="records__panel-title">
-          All tasks
-        </h2>
+        <div className="records__panel-header">
+          <div className="records__panel-title">
+            <h2 id="tasks-list-title">All tasks</h2>
+            {tasks && tasks.length > 0 && <span className="records__count">{tasks.length}</span>}
+          </div>
+          {tasks && tasks.length > 0 && (
+            <ListFilter id="tasks-filter" label="Filter tasks" placeholder="Filter tasks" value={query} onChange={setQuery} />
+          )}
+        </div>
         {content}
       </div>
 

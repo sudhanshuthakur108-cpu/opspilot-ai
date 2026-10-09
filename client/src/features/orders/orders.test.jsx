@@ -41,11 +41,21 @@ function mockServer(handlers) {
 const navigation = () => screen.getByRole('navigation', { name: 'Main' });
 
 // Signs in on the dashboard, then follows the sidebar link, as a user would.
-async function openOrders(handlers = {}) {
+async function openOrdersFromSidebar(handlers = {}) {
   const fetchMock = mockServer(handlers);
   render(<App />);
   await screen.findByRole('heading', { name: 'Dashboard' });
   fireEvent.click(within(navigation()).getByRole('link', { name: 'Orders' }));
+  await screen.findByRole('heading', { level: 1, name: 'Orders' });
+  return fetchMock;
+}
+
+// Loads the page at its own address, so only this page's requests are made (the dashboard
+// loads workspace data of its own).
+async function openOrders(handlers = {}) {
+  const fetchMock = mockServer(handlers);
+  window.history.replaceState(null, '', '/orders');
+  render(<App />);
   await screen.findByRole('heading', { level: 1, name: 'Orders' });
   return fetchMock;
 }
@@ -93,7 +103,7 @@ afterEach(() => {
 
 describe('Orders navigation', () => {
   it('opens from the sidebar as the current page, with Dashboard and Customers still reachable', async () => {
-    await openOrders();
+    await openOrdersFromSidebar();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Orders' })).toBeTruthy();
     expect(window.location.pathname).toBe('/orders');
@@ -106,12 +116,12 @@ describe('Orders navigation', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
   });
 
-  it('opens from the dashboard’s Orders card', async () => {
+  it('opens from the dashboard’s recent orders', async () => {
     mockServer();
     render(<App />);
     await screen.findByRole('heading', { name: 'Dashboard' });
 
-    fireEvent.click(screen.getByRole('link', { name: 'View orders' }));
+    fireEvent.click(screen.getByRole('link', { name: 'All orders' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Orders' })).toBeTruthy();
   });

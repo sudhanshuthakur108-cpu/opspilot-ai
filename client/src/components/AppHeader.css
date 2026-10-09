@@ -1,6 +1,7 @@
 .app-header {
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   border-bottom: 1px solid var(--color-border);
+  backdrop-filter: saturate(1.4) blur(10px);
 }
 
 .app-header__inner {
@@ -9,22 +10,61 @@
   justify-content: space-between;
   gap: var(--space-4);
   max-width: 1120px;
-  height: 64px;
+  height: var(--header-height);
   margin: 0 auto;
   padding: 0 var(--space-5);
+}
+
+.app-header__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .app-header__account {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2);
   min-width: 0;
+  max-width: 260px;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border-left: 1px solid var(--color-border);
+}
+
+.app-header__avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 50%;
+}
+
+.app-header__identity {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.app-header__name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .app-header__email {
   overflow: hidden;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  color: var(--color-text-subtle);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -32,16 +72,46 @@
 .app-header__alert {
   max-width: 1120px;
   margin: 0 auto var(--space-3);
-  border-radius: var(--radius-md);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 899.98px) {
+  .app-header__identity {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .app-header__account {
+    padding-right: 0;
+  }
+}
+
+/* The label stays available to screen readers; only the icon shows. */
+@media (max-width: 599.98px) {
   .app-header__inner {
     padding: 0 var(--space-4);
   }
 
-  .app-header__email {
+  .app-header__account {
     display: none;
+  }
+
+  .app-header__sign-out {
+    width: var(--control-height);
+    min-height: var(--control-height);
+    padding: 0;
+  }
+
+  .app-header__sign-out-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .app-header__alert {

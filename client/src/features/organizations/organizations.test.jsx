@@ -151,7 +151,7 @@ describe('onboarding', () => {
     expect(JSON.parse(init.body)).toEqual({ name: 'Acme Logistics', slug: 'acme-logistics' });
 
     expect(screen.getByRole('status').textContent).toBe('Acme Logistics is ready. You’re its owner.');
-    expect(screen.getByRole('heading', { name: 'Welcome, ada' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Welcome, Ada' })).toBeTruthy();
     expect(within(screen.getByRole('banner')).getByText('Acme Logistics')).toBeTruthy();
     expect(screen.getByText('Owner')).toBeTruthy();
     expect(requestsTo(fetchMock, 'GET', ORGANIZATIONS_URL)).toHaveLength(1);

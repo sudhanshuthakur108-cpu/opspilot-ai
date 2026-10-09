@@ -1,5 +1,5 @@
 .onboarding {
-  max-width: 480px;
+  max-width: 460px;
 }
 
 .onboarding__icon {
@@ -8,9 +8,10 @@
   width: 44px;
   height: 44px;
   margin-bottom: var(--space-5);
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
+  color: var(--color-on-primary);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .onboarding .page-title {
@@ -35,9 +36,23 @@
   border: 0;
 }
 
-.onboarding__footnote {
-  margin-top: var(--space-5);
+.onboarding__facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 0;
+  padding: var(--space-5) 0 0;
   font-size: var(--text-xs);
-  text-align: center;
+  color: var(--color-text-muted);
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.onboarding__facts li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.onboarding__facts .icon {
   color: var(--color-text-subtle);
 }

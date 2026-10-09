@@ -3,10 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Sign in to OpsPilot AI, an operations management workspace for teams." />
-    <meta name="theme-color" content="#f4f5f8" />
+    <meta name="description" content="Sign in to OpsPilot AI, an operations workspace for customers, orders, tasks and an AI assistant whose changes need human approval." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>OpsPilot AI</title>
+    <script>
+      // Applies the saved or system theme before the first paint (src/theme.js keeps it in sync).
+      (function () {
+        var theme = null;
+        try {
+          theme = localStorage.getItem('opspilot-theme');
+        } catch (error) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

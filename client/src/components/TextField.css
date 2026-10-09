@@ -1,11 +1,11 @@
 .field {
   display: grid;
-  gap: var(--space-2);
+  gap: 0.375rem;
 }
 
 .field__label {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 550;
   color: var(--color-text);
 }
 
@@ -17,14 +17,14 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .field__control:hover {
-  border-color: #b4bbc8;
+  border-color: var(--color-text-subtle);
 }
 
 .field__control:focus-within {
@@ -39,7 +39,7 @@
 
 .field__control--invalid:focus-within {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 4px rgb(217 45 32 / 0.14);
+  box-shadow: var(--focus-ring-danger);
 }
 
 .field__control:has(.field__input:disabled) {
@@ -49,8 +49,8 @@
 .field__input {
   flex: 1;
   min-width: 0;
-  height: 44px;
-  padding: 0 0.875rem;
+  height: var(--control-height);
+  padding: 0 0.75rem;
   border: 0;
   border-radius: inherit;
   /* 16px keeps iOS Safari from zooming into the field. */
@@ -72,9 +72,7 @@
 .field__select {
   padding-right: 2.5rem;
   appearance: none;
-  /* A chevron drawn in the muted text color (#545e71). */
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m6 8 4 4 4-4' fill='none' stroke='%23545e71' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    no-repeat right 0.75rem center / 1.125rem;
+  background: var(--icon-chevron) no-repeat right 0.75rem center / 1.125rem;
   cursor: pointer;
 }
 
@@ -112,12 +110,12 @@
 
 .field__toggle:hover:not(:disabled) {
   color: var(--color-text);
-  background: #f0f2f5;
+  background: var(--color-surface-hover);
 }
 
 .field__toggle:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 0;
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
 }
 
 .field__toggle:disabled {

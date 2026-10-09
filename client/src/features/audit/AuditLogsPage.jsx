@@ -3,6 +3,7 @@ import { listAuditLogs } from '../../api/auditLogs.js';
 import { describeRequestError } from '../../api/errorMessages.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
+import { LoadFailure, LoadingRows } from '../../components/RecordStates.jsx';
 import { canManageWorkspace } from '../organizations/roles.js';
 import { AuditLogTable } from './AuditLogTable.jsx';
 import '../../styles/records.css';
@@ -85,22 +86,9 @@ export function AuditLogsPage({ organization }) {
   if (!canView || forbidden) {
     content = <Restricted />;
   } else if (loadError) {
-    content = (
-      <div className="records__state" role="alert">
-        <p className="records__state-title">We couldn’t load the audit log</p>
-        <p className="records__state-text">{loadError}</p>
-        <button type="button" className="button button--secondary button--small" onClick={retry}>
-          Try again
-        </button>
-      </div>
-    );
+    content = <LoadFailure title="We couldn’t load the audit log" message={loadError} onRetry={retry} />;
   } else if (!log) {
-    content = (
-      <div className="records__state records__state--loading">
-        <span className="spinner" aria-hidden="true" />
-        <span role="status">Loading the audit log…</span>
-      </div>
-    );
+    content = <LoadingRows label="Loading the audit log…" rows={5} />;
   } else if (log.entries.length === 0) {
     content = (
       <EmptyState

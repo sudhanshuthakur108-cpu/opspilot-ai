@@ -4,8 +4,10 @@ import { listOrders } from '../../api/orders.js';
 import { useAuth } from '../../auth/authContext.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Icon } from '../../components/Icon.jsx';
+import { ListFilter, LoadFailure, LoadingRows, matchesQuery } from '../../components/RecordStates.jsx';
 import { NewOrderDialog } from './NewOrderDialog.jsx';
 import { OrderTable } from './OrderTable.jsx';
+import { statusLabel } from './orderDisplay.js';
 import '../../styles/records.css';
 
 export function OrdersPage({ organization }) {
@@ -15,6 +17,7 @@ export function OrdersPage({ organization }) {
   const [attempt, setAttempt] = useState(0);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -55,36 +58,27 @@ export function OrdersPage({ organization }) {
     </button>
   );
 
+  const shown = orders?.filter((order) => matchesQuery(query, order.customerName, order.description, statusLabel(order.status))) ?? [];
+
   let content;
   if (loadError) {
-    content = (
-      <div className="records__state" role="alert">
-        <p className="records__state-title">We couldn’t load your orders</p>
-        <p className="records__state-text">{loadError}</p>
-        <button type="button" className="button button--secondary button--small" onClick={retry}>
-          Try again
-        </button>
-      </div>
-    );
+    content = <LoadFailure title="We couldn’t load your orders" message={loadError} onRetry={retry} />;
   } else if (!orders) {
-    content = (
-      <div className="records__state records__state--loading">
-        <span className="spinner" aria-hidden="true" />
-        <span role="status">Loading orders…</span>
-      </div>
-    );
+    content = <LoadingRows label="Loading orders…" />;
   } else if (orders.length === 0) {
     content = (
       <EmptyState
         icon="orders"
         title="No orders yet"
-        description="Record an order for one of your customers, and it will be listed here."
+        description="Record what a customer has ordered to track its status and amount. Every order belongs to one of your customers."
       >
         {newOrderButton}
       </EmptyState>
     );
+  } else if (shown.length === 0) {
+    content = <p className="records__no-match">No orders match “{query.trim()}”.</p>;
   } else {
-    content = <OrderTable orders={orders} labelledBy="orders-list-title" highlightId={created?.id} />;
+    content = <OrderTable orders={shown} labelledBy="orders-list-title" highlightId={created?.id} />;
   }
 
   return (
@@ -105,9 +99,15 @@ export function OrdersPage({ organization }) {
       </div>
 
       <div className="records__panel">
-        <h2 id="orders-list-title" className="records__panel-title">
-          All orders
-        </h2>
+        <div className="records__panel-header">
+          <div className="records__panel-title">
+            <h2 id="orders-list-title">All orders</h2>
+            {orders && orders.length > 0 && <span className="records__count">{orders.length}</span>}
+          </div>
+          {orders && orders.length > 0 && (
+            <ListFilter id="orders-filter" label="Filter orders" placeholder="Filter orders" value={query} onChange={setQuery} />
+          )}
+        </div>
         {content}
       </div>
 

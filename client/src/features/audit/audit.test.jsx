@@ -33,11 +33,21 @@ const navigation = () => screen.getByRole('navigation', { name: 'Main' });
 const table = () => screen.getByRole('table');
 
 // Signs in on the dashboard, then follows the sidebar link, as a user would.
-async function openAuditLogs(options) {
+async function openAuditLogsFromSidebar(options) {
   const fetchMock = mockServer(options);
   render(<App />);
   await screen.findByRole('heading', { name: 'Dashboard' });
   fireEvent.click(within(navigation()).getByRole('link', { name: 'Audit Logs' }));
+  await screen.findByRole('heading', { level: 1, name: 'Audit Logs' });
+  return fetchMock;
+}
+
+// Loads the page at its own address, so only this page's requests are made (the dashboard
+// loads workspace data of its own).
+async function openAuditLogs(options) {
+  const fetchMock = mockServer(options);
+  window.history.replaceState(null, '', '/audit-logs');
+  render(<App />);
   await screen.findByRole('heading', { level: 1, name: 'Audit Logs' });
   return fetchMock;
 }
@@ -67,7 +77,7 @@ afterEach(() => {
 
 describe('Audit Logs navigation', () => {
   it('opens from the sidebar as the current page, and Back returns to the dashboard', async () => {
-    await openAuditLogs();
+    await openAuditLogsFromSidebar();
 
     expect(window.location.pathname).toBe('/audit-logs');
     expect(within(navigation()).getByRole('link', { name: 'Audit Logs' }).getAttribute('aria-current')).toBe('page');
