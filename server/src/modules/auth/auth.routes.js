@@ -9,8 +9,11 @@ import { validateLogin, validateRegistration } from './auth.validation.js';
 const ATTEMPT_LIMIT = 10;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
+// `name` is null for accounts created before names were collected. It is read from the
+// database on every request, never from the session token, so a session always shows the
+// current name.
 function publicUser(user) {
-  return { id: user.id, email: user.email, createdAt: user.createdAt };
+  return { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt };
 }
 
 // `users` is the user store (see modules/users/user.store.js); `sessions` and `requireAuth`
@@ -28,7 +31,7 @@ export function createAuthRouter({ users, sessions, requireAuth }) {
 
   const router = Router();
 
-  // POST /register { email, password } → 201 { user } and a session cookie
+  // POST /register { name, email, password } → 201 { user } and a session cookie
   router.post('/register', limitAttempts, async (req, res) => {
     const credentials = validateRegistration(req.body);
 

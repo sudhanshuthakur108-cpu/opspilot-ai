@@ -4,7 +4,7 @@ import App from './App.jsx';
 import { json, mockApi } from './testing/mockApi.js';
 import { setThemePreference } from './theme.js';
 
-const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
+const USER = { id: 'a'.repeat(24), email: 'ada@example.com', name: 'Ada Lovelace', createdAt: '2026-10-08T09:00:00.000Z' };
 const ACME = { id: 'b'.repeat(24), name: 'Acme', slug: 'acme', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 
 // A stand-in for the browser's dark-mode media query, which jsdom does not have.

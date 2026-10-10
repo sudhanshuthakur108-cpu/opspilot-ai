@@ -89,7 +89,7 @@ describe('startServer with a database', () => {
     const response = await request(server)
       .post('/api/v1/auth/register')
       .set('Origin', CLIENT_ORIGIN)
-      .send({ email: 'ada@example.com', password: 'correct horse battery' });
+      .send({ name: 'Ada Lovelace', email: 'ada@example.com', password: 'correct horse battery' });
 
     expect(response.status).toBe(201);
     await shutdown('SIGTERM');

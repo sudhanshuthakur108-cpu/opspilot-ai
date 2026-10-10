@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeEmail, User } from './user.model.js';
+import { normalizeEmail, normalizeName, User } from './user.model.js';
 
 // These run without a database: Mongoose validates and transforms documents locally.
 describe('User model', () => {
@@ -37,10 +37,29 @@ describe('User model', () => {
     expect(json).not.toHaveProperty('__v');
   });
 
-  it('only stores authentication fields', () => {
+  it('only stores account and authentication fields', () => {
     expect(Object.keys(User.schema.paths).sort()).toEqual(
-      ['__v', '_id', 'createdAt', 'email', 'passwordHash', 'tokenVersion', 'updatedAt'].sort(),
+      ['__v', '_id', 'createdAt', 'email', 'name', 'passwordHash', 'tokenVersion', 'updatedAt'].sort(),
     );
+  });
+
+  it('keeps a name within 2 to 80 characters, and allows none for older accounts', async () => {
+    const valid = new User({ email: 'ada@example.com', name: '  Ada Lovelace ', passwordHash: '$argon2id$hash' });
+    const withoutName = new User({ email: 'ada@example.com', passwordHash: '$argon2id$hash' });
+    const tooShort = await new User({ email: 'ada@example.com', name: 'A', passwordHash: 'x' }).validate().catch((caught) => caught);
+    const tooLong = await new User({ email: 'ada@example.com', name: 'A'.repeat(81), passwordHash: 'x' }).validate().catch((caught) => caught);
+
+    await expect(valid.validate()).resolves.toBeUndefined();
+    expect(valid.name).toBe('Ada Lovelace');
+    await expect(withoutName.validate()).resolves.toBeUndefined();
+    expect(tooShort.errors.name).toBeDefined();
+    expect(tooLong.errors.name).toBeDefined();
+  });
+});
+
+describe('normalizeName', () => {
+  it('trims, joins whitespace and composes accents', () => {
+    expect(normalizeName('  Zoe\u0301 \t  Ange\u0300le\n')).toBe('Zoé Angèle');
   });
 });
 

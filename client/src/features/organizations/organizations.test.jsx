@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
 import { apiError, json, mockApi, requestsTo } from '../../testing/mockApi.js';
 
-const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
+const USER = { id: 'a'.repeat(24), email: 'ada@example.com', name: 'Ada Lovelace', createdAt: '2026-10-08T09:00:00.000Z' };
 const ORGANIZATIONS_URL = '/api/v1/organizations';
 
 const signedIn = () => json(200, { user: USER });

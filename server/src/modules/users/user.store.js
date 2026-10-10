@@ -7,6 +7,8 @@ function toUser(doc) {
   return {
     id: doc._id.toString(),
     email: doc.email,
+    // Null for accounts created before names were collected.
+    name: doc.name ?? null,
     tokenVersion: doc.tokenVersion,
     createdAt: doc.createdAt,
   };
@@ -14,9 +16,9 @@ function toUser(doc) {
 
 export const userStore = {
   // Returns null when the email is already registered (enforced by the unique index).
-  async create({ email, passwordHash }) {
+  async create({ email, name, passwordHash }) {
     try {
-      return toUser(await User.create({ email, passwordHash }));
+      return toUser(await User.create({ email, name, passwordHash }));
     } catch (error) {
       if (isDuplicateKeyError(error)) {
         return null;

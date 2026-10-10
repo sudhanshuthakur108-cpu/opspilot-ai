@@ -5,23 +5,31 @@ import { randomBytes } from 'node:crypto';
 export function createMemoryUserStore() {
   const records = new Map();
 
-  const withoutHash = ({ passwordHash, ...user }) => ({ ...user });
+  // Like the real store, an account without a name (created before names existed) has name null.
+  const withoutHash = ({ passwordHash, ...user }) => ({ ...user, name: user.name ?? null });
 
   return {
     records,
 
-    async create({ email, passwordHash }) {
+    async create({ email, name, passwordHash }) {
       if ([...records.values()].some((record) => record.email === email)) {
         return null;
       }
-      const record = { id: randomBytes(12).toString('hex'), email, passwordHash, tokenVersion: 0, createdAt: new Date() };
+      const record = {
+        id: randomBytes(12).toString('hex'),
+        email,
+        name: name ?? null,
+        passwordHash,
+        tokenVersion: 0,
+        createdAt: new Date(),
+      };
       records.set(record.id, record);
       return withoutHash(record);
     },
 
     async findByEmailWithPassword(email) {
       const record = [...records.values()].find((candidate) => candidate.email === email);
-      return record ? { ...record } : null;
+      return record ? { ...record, name: record.name ?? null } : null;
     },
 
     async findById(id) {

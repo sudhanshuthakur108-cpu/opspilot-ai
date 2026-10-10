@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
 import { apiError, json, mockApi, requestsTo } from '../../testing/mockApi.js';
 
-const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
+const USER = { id: 'a'.repeat(24), email: 'ada@example.com', name: 'Ada Lovelace', createdAt: '2026-10-08T09:00:00.000Z' };
 const ACME = { id: 'b'.repeat(24), name: 'Acme Logistics', slug: 'acme-logistics', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 const GLOBEX = { id: 'c'.repeat(24), name: 'Globex', slug: 'globex', role: 'member', createdAt: '2026-10-01T09:00:00.000Z' };
 const base = (organization) => `/api/v1/organizations/${organization.id}`;
@@ -89,24 +89,27 @@ describe('dashboard', () => {
     expect(header.getByRole('button', { name: /Switch to (dark|light) theme/ })).toBeTruthy();
   });
 
-  it('greets the user by name, never by email address', async () => {
-    await renderDashboard({ user: { ...USER, email: 'ada.lovelace@example.com' } });
+  it.each([
+    ['Sudhanshu Thakur', 'Welcome back, Sudhanshu'],
+    ['Ada Lovelace', 'Welcome back, Ada'],
+    ['  Grace   Brewster Hopper ', 'Welcome back, Grace'],
+    ['Zoé', 'Welcome back, Zoé'],
+  ])('greets an account named %j by first name', async (name, greeting) => {
+    await renderDashboard({ user: { ...USER, name } });
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Welcome back, Ada' })).toBeTruthy();
-    expect(within(screen.getByRole('main')).queryByText(/ada\.lovelace@/)).toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: greeting })).toBeTruthy();
+    expect(within(screen.getByRole('banner')).getByText(greeting.split(', ')[1])).toBeTruthy();
   });
 
-  it('uses the account name when the server sends one', async () => {
-    await renderDashboard({ user: { ...USER, name: 'Grace Hopper' } });
-
-    expect(screen.getByRole('heading', { level: 2, name: 'Welcome back, Grace' })).toBeTruthy();
-  });
-
-  it('greets without a name when the email has nothing name-like in it', async () => {
-    await renderDashboard({ user: { ...USER, email: '1234@example.com' } });
+  it.each([
+    ['no name at all', { id: USER.id, email: 'ada.lovelace@example.com', createdAt: USER.createdAt }],
+    ['a null name', { ...USER, email: 'ada.lovelace@example.com', name: null }],
+  ])('greets an older account with %s without guessing a name from the email', async (_, user) => {
+    await renderDashboard({ user });
 
     expect(screen.getByRole('heading', { level: 2, name: 'Welcome back' })).toBeTruthy();
-    expect(screen.getByRole('main').textContent).not.toContain('1234');
+    expect(within(screen.getByRole('main')).queryByText(/Ada|ada\.lovelace/)).toBeNull();
+    expect(within(screen.getByRole('banner')).getByText('ada.lovelace@example.com')).toBeTruthy();
   });
 
   it('shows the first organization and the user’s role in it when they belong to several', async () => {

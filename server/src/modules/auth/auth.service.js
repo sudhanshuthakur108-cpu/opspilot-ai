@@ -1,9 +1,9 @@
 import { hashPassword, verifyDummyPassword, verifyPassword } from './password.js';
 
 // Returns the new user, or null if the email is already registered.
-export async function registerUser(users, { email, password }) {
+export async function registerUser(users, { name, email, password }) {
   const passwordHash = await hashPassword(password);
-  return users.create({ email, passwordHash });
+  return users.create({ email, name, passwordHash });
 }
 
 // Returns the user (without the password hash) when the credentials match, otherwise null.

@@ -11,12 +11,19 @@ describe('userStore.create', () => {
   it('returns a plain user without the password hash', async () => {
     const createdAt = new Date();
     vi.spyOn(User, 'create').mockResolvedValue(
-      new User({ email: 'ada@example.com', passwordHash: '$argon2id$hash', createdAt }),
+      new User({ email: 'ada@example.com', name: 'Ada Lovelace', passwordHash: '$argon2id$hash', createdAt }),
     );
 
-    const user = await userStore.create({ email: 'ada@example.com', passwordHash: '$argon2id$hash' });
+    const user = await userStore.create({ email: 'ada@example.com', name: 'Ada Lovelace', passwordHash: '$argon2id$hash' });
 
-    expect(user).toEqual({ id: expect.stringMatching(/^[0-9a-f]{24}$/), email: 'ada@example.com', tokenVersion: 0, createdAt });
+    expect(user).toEqual({
+      id: expect.stringMatching(/^[0-9a-f]{24}$/),
+      email: 'ada@example.com',
+      name: 'Ada Lovelace',
+      tokenVersion: 0,
+      createdAt,
+    });
+    expect(User.create).toHaveBeenCalledWith({ email: 'ada@example.com', name: 'Ada Lovelace', passwordHash: '$argon2id$hash' });
   });
 
   it('returns null when the unique email index rejects the insert', async () => {

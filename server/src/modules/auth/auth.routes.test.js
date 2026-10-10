@@ -10,6 +10,7 @@ const ORIGIN = 'http://localhost:5173';
 const SECRET = 'test-secret-that-is-at-least-32-chars';
 const EMAIL = 'ada@example.com';
 const PASSWORD = 'correct horse battery';
+const NAME = 'Ada Lovelace';
 
 function setup({ secureCookie = false } = {}) {
   const users = createMemoryUserStore();
@@ -37,7 +38,7 @@ function sessionCookie(response) {
 }
 
 async function register(app, email = EMAIL) {
-  const response = await post(app, 'register', { email, password: PASSWORD });
+  const response = await post(app, 'register', { name: NAME, email, password: PASSWORD });
   return { response, cookie: sessionCookie(response), user: response.body.user };
 }
 
@@ -50,18 +51,19 @@ function signToken({ alg = 'HS256', secret = SECRET, sub, ver = 0, iss = 'opspil
 }
 
 describe('POST /api/v1/auth/register', () => {
-  it('creates an account, normalizing the email, and returns only safe fields', async () => {
+  it('creates an account, normalizing the email and name, and returns only safe fields', async () => {
     const { app, users } = setup();
 
-    const response = await post(app, 'register', { email: '  Ada@Example.COM ', password: PASSWORD });
+    const response = await post(app, 'register', { name: '  Ada   Lovelace ', email: '  Ada@Example.COM ', password: PASSWORD });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      user: { id: expect.stringMatching(/^[0-9a-f]{24}$/), email: EMAIL, createdAt: expect.any(String) },
+      user: { id: expect.stringMatching(/^[0-9a-f]{24}$/), email: EMAIL, name: NAME, createdAt: expect.any(String) },
     });
 
     const [stored] = users.records.values();
     expect(stored.email).toBe(EMAIL);
+    expect(stored.name).toBe(NAME);
     expect(stored.passwordHash).toMatch(/^\$argon2id\$/);
     expect(response.text).not.toContain(stored.passwordHash);
     expect(response.text).not.toContain(PASSWORD);
@@ -137,11 +139,47 @@ describe('POST /api/v1/auth/register', () => {
     }
   });
 
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['only whitespace', ' \t\n '],
+    ['one character', 'A'],
+    ['over 80 characters', 'A'.repeat(81)],
+    ['without any letters', '12 34'],
+    ['containing a control character', 'Ada\u0000Lovelace'],
+    ['not a string', 42],
+    ['an object', { first: 'Ada' }],
+  ])('rejects a name that is %s, creating no account', async (_, name) => {
+    const { app, users } = setup();
+
+    const response = await post(app, 'register', { name, email: EMAIL, password: PASSWORD });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatchObject({ code: 'VALIDATION_FAILED', message: 'Enter your name, 2 to 80 characters' });
+    expect(sessionSetCookie(response)).toBeUndefined();
+    expect(users.records.size).toBe(0);
+  });
+
+  it.each([
+    ['with a hyphen and an apostrophe', 'Mary-Jane O’Neil', 'Mary-Jane O’Neil'],
+    ['with a period', 'Sudhanshu K. Thakur', 'Sudhanshu K. Thakur'],
+    ['in another script', 'सुधांशु ठाकुर', 'सुधांशु ठाकुर'],
+    ['with accents in decomposed form', 'Zoe\u0301 Ange\u0300le', 'Zoé Angèle'],
+    ['of exactly 80 characters', 'A'.repeat(80), 'A'.repeat(80)],
+  ])('accepts a name %s', async (_, name, stored) => {
+    const { app } = setup();
+
+    const response = await post(app, 'register', { name, email: EMAIL, password: PASSWORD });
+
+    expect(response.status).toBe(201);
+    expect(response.body.user.name).toBe(stored);
+  });
+
   it('rejects a duplicate email regardless of case, without starting a session', async () => {
     const { app, users } = setup();
     await register(app);
 
-    const response = await post(app, 'register', { email: 'ADA@example.com', password: 'another password' });
+    const response = await post(app, 'register', { name: 'Ada Byron', email: 'ADA@example.com', password: 'another password' });
 
     expect(response.status).toBe(409);
     expect(response.body.error).toMatchObject({
@@ -162,10 +200,24 @@ describe('POST /api/v1/auth/login', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ user });
+    expect(response.body.user.name).toBe(NAME);
     expect(sessionSetCookie(response)).toMatch(/; HttpOnly/);
 
     const me = await getMe(app, sessionCookie(response));
     expect(me.status).toBe(200);
+  });
+
+  it('signs in an account created before names were collected, with no name', async () => {
+    const { app, users } = setup();
+    const { user } = await register(app);
+    delete users.records.get(user.id).name;
+
+    const response = await post(app, 'login', { email: EMAIL, password: PASSWORD });
+    const me = await getMe(app, sessionCookie(response));
+
+    expect(response.status).toBe(200);
+    expect(response.body.user).toEqual({ ...user, name: null });
+    expect(me.body.user).toEqual({ ...user, name: null });
   });
 
   it('gives the same answer for a wrong password and an unknown email', async () => {
@@ -213,7 +265,19 @@ describe('GET /api/v1/auth/me', () => {
     expect(response.status).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
     expect(response.body).toEqual({ user });
-    expect(Object.keys(response.body.user).sort()).toEqual(['createdAt', 'email', 'id']);
+    expect(response.body.user.name).toBe(NAME);
+    expect(Object.keys(response.body.user).sort()).toEqual(['createdAt', 'email', 'id', 'name']);
+    expect(response.text).not.toMatch(/passwordHash|tokenVersion|argon2/);
+  });
+
+  it('returns the name stored now, not the one at sign-in', async () => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+    users.records.get(user.id).name = 'Ada King';
+
+    const response = await getMe(app, cookie);
+
+    expect(response.body.user.name).toBe('Ada King');
   });
 
   it('rejects a request without a session cookie', async () => {

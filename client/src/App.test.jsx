@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.jsx';
 
-const USER = { id: 'a'.repeat(24), email: 'ada@example.com', createdAt: '2026-10-08T09:00:00.000Z' };
+const USER = { id: 'a'.repeat(24), email: 'ada@example.com', name: 'Ada Lovelace', createdAt: '2026-10-08T09:00:00.000Z' };
 const PASSWORD = 'correct horse battery';
 const ACME = { id: 'b'.repeat(24), name: 'Acme Logistics', slug: 'acme-logistics', role: 'owner', createdAt: '2026-10-08T09:30:00.000Z' };
 
@@ -235,13 +235,47 @@ describe('creating an account', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
     expect(screen.getByRole('heading', { name: 'Create your account' })).toBeTruthy();
     expect(screen.getByLabelText('Password').getAttribute('autocomplete')).toBe('new-password');
+    expect(screen.getByLabelText('Full name').getAttribute('autocomplete')).toBe('name');
+    fillIn('Full name', '  Ada Lovelace ');
     fillIn('Email', 'ada@example.com');
     fillIn('Password', PASSWORD);
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Welcome back, Ada' })).toBeTruthy();
     const [[, init]] = requestsTo(fetchMock, 'POST', '/api/v1/auth/register');
-    expect(JSON.parse(init.body)).toEqual({ email: 'ada@example.com', password: PASSWORD });
+    expect(JSON.parse(init.body)).toEqual({ name: 'Ada Lovelace', email: 'ada@example.com', password: PASSWORD });
+  });
+
+  it.each([
+    ['missing', '', 'Enter your name.'],
+    ['only spaces', '   ', 'Enter your name.'],
+    ['one character', 'A', 'Use 2 to 80 characters, including at least one letter.'],
+    ['without letters', '12', 'Use 2 to 80 characters, including at least one letter.'],
+    ['over 80 characters', 'A'.repeat(81), 'Use 2 to 80 characters, including at least one letter.'],
+  ])('asks for a name that is %s before calling the API, and focuses it', async (_, name, message) => {
+    const fetchMock = await renderSignedOut();
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
+    fillIn('Full name', name);
+    fillIn('Email', 'ada@example.com');
+    fillIn('Password', PASSWORD);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.getByLabelText('Full name').getAttribute('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByLabelText('Full name'));
+    expect(requestsTo(fetchMock, 'POST', '/api/v1/auth/register')).toHaveLength(0);
+  });
+
+  it('asks for a name only when creating an account', async () => {
+    await renderSignedOut();
+
+    expect(screen.queryByLabelText('Full name')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
+    expect(screen.getByLabelText('Full name')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.queryByLabelText('Full name')).toBeNull();
   });
 
   it('asks for a longer password before calling the API', async () => {

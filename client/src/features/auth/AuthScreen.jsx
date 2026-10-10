@@ -11,6 +11,8 @@ import './AuthScreen.css';
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
+const NAME_MIN_LENGTH = 2;
+const NAME_MAX_LENGTH = 80;
 
 const COPY = {
   signIn: {
@@ -33,8 +35,17 @@ const COPY = {
   },
 };
 
-function validate({ email, password }, mode) {
+function validate({ name, email, password }, mode) {
   const errors = {};
+
+  if (mode === 'signUp') {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      errors.name = 'Enter your name.';
+    } else if (trimmed.length < NAME_MIN_LENGTH || trimmed.length > NAME_MAX_LENGTH || !/\p{L}/u.test(trimmed)) {
+      errors.name = `Use ${NAME_MIN_LENGTH} to ${NAME_MAX_LENGTH} characters, including at least one letter.`;
+    }
+  }
 
   if (!email.trim()) {
     errors.email = 'Enter your email address.';
@@ -78,10 +89,11 @@ function describeError(error, mode) {
 export function AuthScreen() {
   const { signIn, signUp, sessionCheckFailed, sessionExpired } = useAuth();
   const [mode, setMode] = useState('signIn');
-  const [values, setValues] = useState({ email: '', password: '' });
+  const [values, setValues] = useState({ name: '', email: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const nameRef = useRef(null);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
 
@@ -112,15 +124,20 @@ export function AuthScreen() {
     const errors = validate(values, mode);
     setFieldErrors(errors);
     setFormError('');
-    if (errors.email || errors.password) {
-      (errors.email ? emailRef : passwordRef).current.focus();
+    const firstInvalid = [
+      [errors.name, nameRef],
+      [errors.email, emailRef],
+      [errors.password, passwordRef],
+    ].find(([error]) => error);
+    if (firstInvalid) {
+      firstInvalid[1].current.focus();
       return;
     }
 
     setSubmitting(true);
     try {
       const credentials = { email: values.email.trim(), password: values.password };
-      await (mode === 'signIn' ? signIn(credentials) : signUp(credentials));
+      await (mode === 'signIn' ? signIn(credentials) : signUp({ ...credentials, name: values.name.trim() }));
     } catch (error) {
       setValues((current) => ({ ...current, password: '' }));
       setFormError(describeError(error, mode));
@@ -181,6 +198,19 @@ export function AuthScreen() {
 
           <form className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={submitting}>
             <fieldset className="auth-form__fields" disabled={submitting}>
+              {mode === 'signUp' && (
+                <TextField
+                  ref={nameRef}
+                  id="name"
+                  name="name"
+                  label="Full name"
+                  autoComplete="name"
+                  placeholder="Ada Lovelace"
+                  value={values.name}
+                  onChange={updateField}
+                  error={fieldErrors.name}
+                />
+              )}
               <TextField
                 ref={emailRef}
                 id="email"

@@ -278,6 +278,8 @@ sequenceDiagram
 ### Authentication (implemented; not yet verified against a real database or in deployment)
 
 - **Passwords** are hashed with Argon2id (`@node-rs/argon2`: 19 MiB memory, 2 iterations, 1 lane) and are never logged or returned. Registration requires 8–128 characters.
+- **Account name:** `POST /auth/register` takes `{ name, email, password }`. The name is required: it is normalized (Unicode NFC, trimmed, runs of whitespace joined into one space) and must be 2–80 characters with at least one letter and no control characters; any script and common punctuation are accepted. Invalid names get 400 `VALIDATION_FAILED` and no account is created. The register, login and `/auth/me` responses return `{ id, email, name, createdAt }`. The name is read from the database on every request and is not in the session token, so it can never be stale there.
+- **Accounts without a name:** accounts created before names were collected have no `name` field. They sign in as before (login only checks email and password) and are returned with `name: null`; the client then greets them without a name. Nothing is filled in automatically, and no backfill has been run. One would need each person to supply their own name (there is no endpoint for changing it yet), since a name cannot be reliably derived from an email address.
 - **Sessions** use a signed JWT stored in an `httpOnly` cookie set with `Path=/`, `SameSite=Strict`, and `Secure` in production. `Strict` costs nothing here because the client and API share an origin.
   - Verification accepts only HS256 with `JWT_SECRET` and requires the `sub`, `iat`, `exp` and `iss` claims.
   - The token's expiry and the cookie's max age are both 8 hours.

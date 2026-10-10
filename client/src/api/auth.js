@@ -18,8 +18,8 @@ export async function login({ email, password }) {
   return user;
 }
 
-export async function register({ email, password }) {
-  const { user } = await apiRequest('/auth/register', { method: 'POST', body: { email, password } });
+export async function register({ name, email, password }) {
+  const { user } = await apiRequest('/auth/register', { method: 'POST', body: { name, email, password } });
   return user;
 }
 

@@ -1,5 +1,5 @@
 import { HttpError } from '../../lib/httpError.js';
-import { EMAIL_FORMAT, EMAIL_MAX_LENGTH, normalizeEmail } from '../users/user.model.js';
+import { EMAIL_FORMAT, EMAIL_MAX_LENGTH, NAME_MAX_LENGTH, NAME_MIN_LENGTH, normalizeEmail, normalizeName } from '../users/user.model.js';
 
 export const PASSWORD_MIN_LENGTH = 8;
 // Caps the hashing work a single request can cause; long passphrases still fit.
@@ -17,7 +17,17 @@ function readEmail(body) {
   return email;
 }
 
-// Body: { email: string, password: string }
+// Any script and common punctuation (spaces, hyphens, apostrophes, periods) are fine. A name
+// needs at least one letter and no control characters.
+function readName(body) {
+  const name = typeof body?.name === 'string' ? normalizeName(body.name) : '';
+  if (name.length < NAME_MIN_LENGTH || name.length > NAME_MAX_LENGTH || !/\p{L}/u.test(name) || /\p{Cc}/u.test(name)) {
+    throw invalid(`Enter your name, ${NAME_MIN_LENGTH} to ${NAME_MAX_LENGTH} characters`);
+  }
+  return name;
+}
+
+// Body: { name: string, email: string, password: string }
 export function validateRegistration(body) {
   const email = readEmail(body);
   const password = body.password;
@@ -30,11 +40,11 @@ export function validateRegistration(body) {
     throw invalid(`Password must be between ${PASSWORD_MIN_LENGTH} and ${PASSWORD_MAX_LENGTH} characters`);
   }
 
-  return { email, password };
+  return { name: readName(body), email, password };
 }
 
 // Body: { email: string, password: string }. Only the shape is checked, so tightening the
-// registration rules later cannot lock out existing users.
+// registration rules later (such as requiring a name) cannot lock out existing users.
 export function validateLogin(body) {
   const email = readEmail(body);
   const password = body.password;
