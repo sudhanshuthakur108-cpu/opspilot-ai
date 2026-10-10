@@ -20,7 +20,8 @@ function mockServer({ organization = ACME, ...handlers } = {}) {
 
 const navigation = () => screen.getByRole('navigation', { name: 'Main' });
 const nameField = () => screen.getByLabelText('Organization name');
-const saveButton = () => screen.getByRole('button', { name: /^Sav/ });
+// The workspace form's button; the profile form has its own.
+const saveButton = () => within(screen.getByRole('form', { name: 'Workspace details' })).getByRole('button', { name: /^Sav/ });
 const aboutPanel = () => within(screen.getByRole('region', { name: 'About this workspace' }));
 
 // Signs in on the dashboard, then follows the sidebar link, as a user would.

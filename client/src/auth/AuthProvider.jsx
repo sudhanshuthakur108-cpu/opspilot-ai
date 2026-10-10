@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getCurrentUser, login, logout, register } from '../api/auth.js';
+import { getCurrentUser, login, logout, register, updateProfile as saveProfile } from '../api/auth.js';
 import { AuthContext } from './authContext.js';
 
 const SIGNED_OUT = { status: 'unauthenticated', user: null, sessionCheckFailed: false, sessionExpired: false };
@@ -49,9 +49,16 @@ export function AuthProvider({ children }) {
     setSession(SIGNED_OUT);
   }, []);
 
+  // Keeps the user the server returns, so what every screen shows is what was saved.
+  const updateProfile = useCallback(async (changes) => {
+    const user = await saveProfile(changes);
+    setSession((current) => ({ ...current, user }));
+    return user;
+  }, []);
+
   const value = useMemo(
-    () => ({ ...session, signIn, signUp, signOut, endSession }),
-    [session, signIn, signUp, signOut, endSession],
+    () => ({ ...session, signIn, signUp, signOut, endSession, updateProfile }),
+    [session, signIn, signUp, signOut, endSession, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

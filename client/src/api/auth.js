@@ -23,6 +23,12 @@ export async function register({ name, email, password }) {
   return user;
 }
 
+// Changes the signed-in user's own name and returns the user as the server saved it.
+export async function updateProfile({ name }) {
+  const { user } = await apiRequest('/auth/me', { method: 'PATCH', body: { name } });
+  return user;
+}
+
 export async function logout() {
   await apiRequest('/auth/logout', { method: 'POST' });
 }

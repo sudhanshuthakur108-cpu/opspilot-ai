@@ -43,6 +43,20 @@ export function validateRegistration(body) {
   return { name: readName(body), email, password };
 }
 
+// Body: { name: string }. Only the name can change here, so any other field (an email, an ID,
+// a role) is refused rather than ignored: a client sending one expects something to happen
+// that will not. The account is always the signed-in user's.
+export function validateProfileChanges(body) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    throw invalid('Send the changes as a JSON object');
+  }
+  const unexpected = Object.keys(body).filter((key) => key !== 'name');
+  if (unexpected.length > 0) {
+    throw invalid('Only your name can be changed');
+  }
+  return { name: readName(body) };
+}
+
 // Body: { email: string, password: string }. Only the shape is checked, so tightening the
 // registration rules later (such as requiring a name) cannot lock out existing users.
 export function validateLogin(body) {

@@ -66,4 +66,42 @@ describe.skipIf(!uri)('account names against MongoDB', () => {
     expect(me.body.user.name).toBeNull();
     expect(await User.collection.findOne({ email: 'legacy@example.com' })).not.toHaveProperty('name');
   });
+
+  it('saves a changed name for the signed-in user only', async () => {
+    const ada = await post('register', { name: 'Ada Lovelace', email: 'ada@example.com', password: PASSWORD });
+    await post('register', { name: 'Grace Hopper', email: 'grace@example.com', password: PASSWORD });
+
+    const response = await request(app)
+      .patch('/api/v1/auth/me')
+      .set('Origin', ORIGIN)
+      .set('Cookie', cookieOf(ada))
+      .send({ name: '  Ada   King ' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.user).toEqual({ ...ada.body.user, name: 'Ada King' });
+    expect((await User.findOne({ email: 'ada@example.com' }).lean()).name).toBe('Ada King');
+    expect((await User.findOne({ email: 'grace@example.com' }).lean()).name).toBe('Grace Hopper');
+  });
+
+  it('lets an account created before names existed set one', async () => {
+    await User.collection.insertOne({
+      email: 'legacy@example.com',
+      passwordHash: await hashPassword(PASSWORD),
+      tokenVersion: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const login = await post('login', { email: 'legacy@example.com', password: PASSWORD });
+
+    const response = await request(app)
+      .patch('/api/v1/auth/me')
+      .set('Origin', ORIGIN)
+      .set('Cookie', cookieOf(login))
+      .send({ name: 'Legacy Person' });
+    const me = await request(app).get('/api/v1/auth/me').set('Cookie', cookieOf(login));
+
+    expect(response.status).toBe(200);
+    expect((await User.collection.findOne({ email: 'legacy@example.com' })).name).toBe('Legacy Person');
+    expect(me.body.user.name).toBe('Legacy Person');
+  });
 });

@@ -45,6 +45,13 @@ export const userStore = {
     return docs.map(toUser);
   },
 
+  // Returns the updated user, or null when there is no user with this ID. Only the name
+  // changes; the session's token version is untouched, so the user stays signed in.
+  async updateName(id, name) {
+    const doc = await User.findByIdAndUpdate(id, { $set: { name } }, { returnDocument: 'after', runValidators: true }).lean();
+    return doc && toUser(doc);
+  },
+
   async incrementTokenVersion(id) {
     await User.updateOne({ _id: id }, { $inc: { tokenVersion: 1 } });
   },

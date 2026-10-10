@@ -6,6 +6,7 @@ import { Icon } from '../../components/Icon.jsx';
 import { TextField } from '../../components/TextField.jsx';
 import { setThemePreference, useTheme } from '../../theme.js';
 import { canManageWorkspace, roleLabel } from '../organizations/roles.js';
+import { ProfileSection } from './ProfileSection.jsx';
 import '../../styles/records.css';
 import './Settings.css';
 
@@ -124,11 +125,22 @@ export function SettingsPage({ organization, onUpdated }) {
     <div className="records">
       <div className="records__header">
         <p className="records__intro">
-          Settings for <strong>{organization.name}</strong>.
+          Your own profile, and the settings for <strong>{organization.name}</strong>.
         </p>
       </div>
 
-      <form className="records__panel settings-form settings-section" onSubmit={handleSubmit} noValidate aria-busy={saving}>
+      <p className="settings-group">Personal</p>
+      <ProfileSection />
+      <Appearance />
+
+      <p className="settings-group">Workspace</p>
+      <form
+        className="records__panel settings-form settings-section"
+        onSubmit={handleSubmit}
+        noValidate
+        aria-labelledby="settings-details-title"
+        aria-busy={saving}
+      >
         <div className="settings-section__intro">
           <h2 id="settings-details-title" className="records__panel-title">
             Workspace details
@@ -188,8 +200,6 @@ export function SettingsPage({ organization, onUpdated }) {
           </fieldset>
         </div>
       </form>
-
-      <Appearance />
 
       <section className="records__panel settings-section" aria-labelledby="settings-about-title">
         <div className="settings-section__intro">

@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { HttpError } from '../../lib/httpError.js';
 import { findSessionUser } from './auth.middleware.js';
 import { authenticateUser, registerUser } from './auth.service.js';
-import { validateLogin, validateRegistration } from './auth.validation.js';
+import { validateLogin, validateProfileChanges, validateRegistration } from './auth.validation.js';
 
 // Register and login attempts allowed per client IP in each window.
 const ATTEMPT_LIMIT = 10;
@@ -72,6 +72,21 @@ export function createAuthRouter({ users, sessions, requireAuth }) {
   // GET /me → 200 { user }
   router.get('/me', requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store').json({ user: publicUser(req.user) });
+  });
+
+  // PATCH /me { name } → 200 { user }. Changes the signed-in user's own name; the account is
+  // always the session's, never one named in the request. Not recorded in the audit log, which
+  // belongs to an organization: a person's name is theirs, not any one workspace's.
+  router.patch('/me', requireAuth, async (req, res) => {
+    const { name } = validateProfileChanges(req.body);
+
+    const user = await users.updateName(req.user.id, name);
+    if (!user) {
+      // The account was removed after the session was checked.
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Authentication required');
+    }
+
+    res.set('Cache-Control', 'no-store').json({ user: publicUser(user) });
   });
 
   return router;

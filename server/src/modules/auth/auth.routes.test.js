@@ -340,6 +340,154 @@ describe('GET /api/v1/auth/me', () => {
   });
 });
 
+describe('PATCH /api/v1/auth/me', () => {
+  function patchMe(app, cookie, body) {
+    const req = request(app).patch('/api/v1/auth/me').set('Origin', ORIGIN);
+    return (cookie ? req.set('Cookie', cookie) : req).send(body);
+  }
+
+  it('changes the signed-in user’s name, normalized, and returns only safe fields', async () => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+
+    const response = await patchMe(app, cookie, { name: '  Ada   King  ' });
+
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).toEqual({ user: { ...user, name: 'Ada King' } });
+    expect(Object.keys(response.body.user).sort()).toEqual(['createdAt', 'email', 'id', 'name']);
+    expect(response.text).not.toMatch(/passwordHash|tokenVersion|argon2/);
+    expect(users.records.get(user.id).name).toBe('Ada King');
+  });
+
+  it('keeps the session valid and the new name visible to /me', async () => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+    const versionBefore = users.records.get(user.id).tokenVersion;
+
+    await patchMe(app, cookie, { name: 'Ada King' });
+    const me = await getMe(app, cookie);
+
+    expect(me.status).toBe(200);
+    expect(me.body.user.name).toBe('Ada King');
+    expect(users.records.get(user.id).tokenVersion).toBe(versionBefore);
+  });
+
+  it('lets an account created before names existed set one', async () => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+    delete users.records.get(user.id).name;
+
+    const response = await patchMe(app, cookie, { name: 'Ada Lovelace' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.user.name).toBe('Ada Lovelace');
+    expect((await getMe(app, cookie)).body.user.name).toBe('Ada Lovelace');
+  });
+
+  it.each([
+    ['missing', {}],
+    ['empty', { name: '' }],
+    ['only whitespace', { name: '   ' }],
+    ['one character', { name: 'A' }],
+    ['over 80 characters', { name: 'A'.repeat(81) }],
+    ['without any letters', { name: '42' }],
+    ['not a string', { name: ['Ada'] }],
+  ])('rejects a name that is %s, changing nothing', async (_, body) => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+
+    const response = await patchMe(app, cookie, body);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatchObject({ code: 'VALIDATION_FAILED', message: 'Enter your name, 2 to 80 characters' });
+    expect(users.records.get(user.id).name).toBe(NAME);
+  });
+
+  it.each([
+    ['an email', { name: 'Ada King', email: 'other@example.com' }],
+    ['a user ID', { name: 'Ada King', id: 'f'.repeat(24) }],
+    ['a token version', { name: 'Ada King', tokenVersion: 0 }],
+    ['a password', { name: 'Ada King', password: 'new password 123' }],
+  ])('refuses %s alongside the name, changing nothing', async (_, body) => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+
+    const response = await patchMe(app, cookie, body);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatchObject({ code: 'VALIDATION_FAILED', message: 'Only your name can be changed' });
+    expect(users.records.get(user.id)).toMatchObject({ name: NAME, email: EMAIL });
+  });
+
+  it.each([
+    ['a JSON array', [{ name: 'Ada King' }], 'VALIDATION_FAILED'],
+    // The JSON parser only accepts objects and arrays at the top level.
+    ['a JSON string', '"Ada King"', 'INVALID_JSON'],
+  ])('rejects %s as the body', async (_, body, code) => {
+    const { app } = setup();
+    const { cookie } = await register(app);
+
+    const response = await request(app)
+      .patch('/api/v1/auth/me')
+      .set('Origin', ORIGIN)
+      .set('Cookie', cookie)
+      .set('Content-Type', 'application/json')
+      .send(typeof body === 'string' ? body : JSON.stringify(body));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe(code);
+  });
+
+  it('changes only the signed-in user, whatever account the request names', async () => {
+    const { app, users } = setup();
+    const ada = await register(app, 'ada@example.com');
+    const grace = await register(app, 'grace@example.com');
+
+    const namingGrace = await patchMe(app, ada.cookie, { name: 'Ada King', id: grace.user.id });
+    const valid = await patchMe(app, ada.cookie, { name: 'Ada King' });
+
+    expect(namingGrace.status).toBe(400);
+    expect(valid.body.user.id).toBe(ada.user.id);
+    expect(users.records.get(ada.user.id).name).toBe('Ada King');
+    expect(users.records.get(grace.user.id).name).toBe(NAME);
+  });
+
+  it.each([
+    ['without a session', async () => undefined],
+    ['with an invalid token', async () => `${SESSION_COOKIE}=not-a-jwt`],
+    [
+      'after logging out',
+      async (app, cookie) => {
+        await post(app, 'logout').set('Cookie', cookie);
+        return cookie;
+      },
+    ],
+  ])('rejects a request %s with 401, changing nothing', async (_, getCookie) => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+
+    const response = await patchMe(app, await getCookie(app, cookie), { name: 'Mallory' });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHENTICATED');
+    expect(users.records.get(user.id).name).toBe(NAME);
+  });
+
+  it.each([
+    ['another site', (req) => req.set('Origin', 'https://evil.example').send({ name: 'Mallory' }), 403],
+    ['a form post', (req) => req.set('Origin', ORIGIN).type('form').send('name=Mallory'), 415],
+  ])('rejects a request from %s before changing anything', async (_, send, status) => {
+    const { app, users } = setup();
+    const { cookie, user } = await register(app);
+
+    const response = await send(request(app).patch('/api/v1/auth/me').set('Cookie', cookie));
+
+    expect(response.status).toBe(status);
+    expect(users.records.get(user.id).name).toBe(NAME);
+  });
+});
+
 describe('POST /api/v1/auth/logout', () => {
   it('clears the cookie and invalidates copies of the token', async () => {
     const { app, users } = setup();

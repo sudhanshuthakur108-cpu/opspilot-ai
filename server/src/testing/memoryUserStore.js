@@ -41,6 +41,13 @@ export function createMemoryUserStore() {
       return ids.map((id) => records.get(id)).filter(Boolean).map(withoutHash);
     },
 
+    async updateName(id, name) {
+      const record = records.get(id);
+      if (!record) return null;
+      record.name = name;
+      return withoutHash(record);
+    },
+
     async incrementTokenVersion(id) {
       records.get(id).tokenVersion += 1;
     },
