@@ -19,7 +19,7 @@ flowchart LR
 
     subgraph vercel["Vercel"]
         spa["React SPA<br/>(static build)"]
-        rewrite["/api/* rewrite<br/>(to verify in Phase 3)"]
+        rewrite["/api/* rewrite<br/>(client/vercel.json; unverified)"]
     end
 
     subgraph render["Render"]
@@ -42,15 +42,15 @@ flowchart LR
     oai -->|"HTTPS, server-side key"| openai
 ```
 
-**Same-origin API calls (planned; must be verified in Phase 3).** The client will call `/api/v1/*` on its own origin. In development, the Vite dev server will proxy `/api` to the local Express server. In production, a Vercel rewrite will proxy `/api` to the Render service. This keeps the auth cookie first-party, avoids cross-site cookie restrictions, and removes the need for CORS in normal operation.
+**Same-origin API calls (configured; must be verified on a deployment).** The client calls `/api/v1/*` on its own origin with `credentials: 'same-origin'`. In development, the Vite dev server proxies `/api` to the local Express server. In production, the rewrite in `client/vercel.json` proxies `/api/*` to the Render service (see [Section 7](#deployment)). This keeps the auth cookie first-party, avoids cross-site cookie restrictions, and removes the need for CORS.
 
-This approach is **unverified**. The deployment phases must confirm that the Vercel rewrite:
+This approach is **unverified** until it runs on a real deployment. The [pre-launch checklist](../README.md#pre-launch-checklist) must confirm that the Vercel rewrite:
 
 - forwards request headers (including `Origin` and `Cookie`) and response `Set-Cookie` headers correctly;
 - has a proxy timeout long enough for AI calls and Render cold starts;
-- passes the real client IP through to Express, so rate limiting works.
+- passes the client IP through in `X-Forwarded-For`, and how many proxies add to it (`TRUST_PROXY`), so rate limiting works.
 
-**Fallback if the rewrite is unsuitable:** serve the client and API from subdomains of one custom domain, for example `app.<domain>` and `api.<domain>`. These count as the same site, so `SameSite=Strict` cookies still work. The API would then use credentialed CORS restricted to `CLIENT_ORIGIN`.
+**Fallback if the rewrite is unsuitable (not implemented):** serve the client and API from subdomains of one custom domain, for example `app.<domain>` and `api.<domain>`. These count as the same site, so `SameSite=Strict` cookies still work. It needs code changes: the client would have to send credentials cross-origin (`credentials: 'include'` and an absolute `VITE_API_BASE_URL`), and the API would need credentialed CORS restricted to `CLIENT_ORIGIN`.
 
 Calling the default `*.onrender.com` API directly from a `*.vercel.app` page is **not** a viable fallback for cookie auth. Those are different sites, so it would need `SameSite=None` cookies, which some browsers block as third-party cookies.
 
@@ -296,7 +296,7 @@ sequenceDiagram
   - State-changing requests must use `Content-Type: application/json` (otherwise 415).
   - They must also send an `Origin` header that matches `CLIENT_ORIGIN`; a missing or different `Origin` gets a 403.
   - Together with `SameSite=Strict` cookies, these rules block cross-site form and fetch attacks.
-- **Brute-force protection:** login and register share a limit of 10 attempts per client IP per 15 minutes (in memory, per instance). The IP is only correct once the `trust proxy` setting is configured (see [Section 6](#error-handling-planned)). A per-account login limit is still planned. Login failures return a generic message that does not reveal whether the email exists, and an unknown email still runs a full password verification so response timing is similar.
+- **Brute-force protection:** login and register share a limit of 10 attempts per client IP per 15 minutes (in memory, per instance). The IP comes from Express's `trust proxy` setting, which `TRUST_PROXY` controls and which is only correct once it matches the deployed proxy chain (see [Proxies and client IPs](#proxies-and-client-ips)). A per-account login limit is still planned. Login failures return a generic message that does not reveal whether the email exists, and an unknown email still runs a full password verification so response timing is similar.
 - **Registration** returns 409 for an email that is already registered. This reveals that the account exists, which cannot be avoided without email verification; the rate limit slows scanning.
 
 ### Organization-level data isolation (membership checks implemented; customers, orders and tasks are organization-owned resources)
@@ -332,6 +332,7 @@ sequenceDiagram
 | `VITE_API_BASE_URL` | Client | No | In use; in `client/.env.example` (defaults to `/api/v1`) |
 | `API_PROXY_TARGET` | Vite dev server config only (not bundled) | No | In use; in `client/.env.example` (defaults to `http://localhost:3000`) |
 | `CLIENT_ORIGIN` | Server | No | In use; in `server/.env.example` (Origin check; defaults to `http://localhost:5173` outside production; required, https, in production) |
+| `TRUST_PROXY` | Server | No | In use; in `server/.env.example` (number of proxies in front of the API, `0`–`5`; defaults to `0` outside production; required in production, measured on the deployment) |
 | `MONGODB_URI` | Server | **Yes** | In use; in `server/.env.example` (required in production, optional in development and test) |
 | `AI_PROVIDER` | Server | No | In use; in `server/.env.example` (`development`, the default, or `openai`) |
 | `OPENAI_API_KEY` | Server | **Yes** | In use; in `server/.env.example` (read only when `AI_PROVIDER=openai`) |
@@ -370,7 +371,17 @@ Planned variables are added to `server/.env.example` in the phase that first use
 - Each request gets an ID that is included in logs and error responses so problems can be traced.
 - Structured server logs redact passwords, tokens, cookies and API keys.
 - Other baseline protections: security headers (helmet) and a 10 kB JSON body limit are in place. A timeout on outbound AI calls is planned.
-- Express's `trust proxy` setting must match the real proxy chain (Vercel rewrite, then Render). This makes the client IP used for rate limiting correct and stops it being spoofed through `X-Forwarded-For`. The exact setting will be confirmed in Phase 3.
+
+### Proxies and client IPs
+
+In production, every request reaches Express through proxies (the Vercel rewrite and Render's own front end). Each proxy appends the address it received the request from to `X-Forwarded-For`. Express's `trust proxy` setting decides how many of those entries, counted from the right, to believe. `req.ip`, which the sign-in rate limit is keyed on, is the entry just before them.
+
+- **`TRUST_PROXY`** (`server/src/config/proxy.js`) is that number of proxies: a whole number from 0 to 5. `createApp` applies it before any middleware runs (0 becomes `false`, so express-rate-limit still warns when `X-Forwarded-For` arrives untrusted). The startup log line `server started` includes it.
+- **Development and test** default to 0, since nothing sits in front of the app (the Vite dev proxy adds no `X-Forwarded-For`).
+- **Production** refuses to start without an explicit value. `true` (trust any chain), lists, subnets, negative numbers and anything above 5 are refused everywhere. The upper bound only catches typos; it is not a recommended value.
+- **The production value is not known yet.** It depends on how many proxies Vercel and Render actually put in front of the app, and it must be measured on the deployment with the procedure in the [README](../README.md#environment-variables-by-platform), not guessed. Too low, and all clients share one rate-limit key, so a handful of attempts locks everyone out of sign-in. Too high, and Express reads an entry the client wrote itself, so a client can choose its IP and avoid the limit.
+- **Direct access to Render:** the `*.onrender.com` hostname is publicly reachable and skips Vercel, so its chain is shorter. A value measured for the Vercel chain lets a direct caller choose its own IP there and avoid the sign-in limit. It does not expose sessions (the cookie is host-only to the Vercel site and the origin check still applies). How to close this gap is an [open question](#9-open-questions).
+- Tests cover the configuration rules, production fail-fast (including the real entry point), and the rate limit counting per client behind trusted proxies, ignoring entries a client adds, and sharing one key when no proxy is trusted.
 
 ## 7. Testing and Deployment
 
@@ -389,19 +400,46 @@ Tests for code that uses MongoDB transactions need a replica-set test database, 
 
 A CI workflow that runs lint and tests on each push (*candidate:* GitHub Actions) is planned once there is code to test.
 
-### Deployment (planned)
+### Deployment
 
-| Component | Platform | Plan |
+Configured in the repository but **not deployed**. The exact dashboard settings, the environment variables per platform and the blocking [pre-launch checklist](../README.md#pre-launch-checklist) are in the README.
+
+| Component | Platform | Configuration |
 | --- | --- | --- |
-| Client | **Vercel** | Root directory `client/`; Vite build output `dist/`; SPA fallback to `index.html`; rewrite `/api/*` to the Render service |
-| Server | **Render** | Web Service with root directory `server/`; health check path `/api/v1/health`; environment variables set in the dashboard |
-| Database | **MongoDB Atlas** | Separate databases for development and production; least-privilege database user; TLS (Atlas default) |
+| Client | **Vercel** | Root directory `client/`, Vite preset, output `dist/`. `client/vercel.json` holds the rewrites and headers. No environment variables (`VITE_API_BASE_URL` stays `/api/v1`) |
+| Server | **Render** | Web Service from the **repository root**, because the only lockfile is the root `package-lock.json` (npm workspaces): build `npm ci --workspace server --omit=dev`, start `npm start --workspace server`, Node from `.node-version` (`24.18.0`), health check `/api/v1/health`. Server variables and secrets are set in the dashboard |
+| Database | **MongoDB Atlas** | Separate databases for development and production; least-privilege database user; TLS (Atlas default). Indexes are created at startup (`model.init()`); there are no seed or migration scripts |
 
-To verify at deployment time:
+**Routing (`client/vercel.json`).** Vercel serves files from the build first. Then the rewrites run in order and the first match wins:
 
-- Render's free tier sleeps when idle, so the first request after a pause can be slow.
+1. `/api/:path*` goes to `https://opspilot-ai-52dj.onrender.com/api/:path*`, the Render service.
+2. `/(.*)` goes to `/index.html`, so every client route (`/settings`, `/customers`, ...) loads the app, which picks the page from the path.
+
+`client/vercel.test.js` checks this order, that the API destination is an https URL, and the security headers.
+
+**Security headers.** Every response gets `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and `Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`. Clickjacking is blocked twice over: by `frame-ancestors` and `X-Frame-Options`, and by `SameSite=Strict`, which keeps the session cookie out of cross-site frames. API responses also carry helmet's own headers.
+
+#### Content Security Policy
+
+The shipped policy deliberately restricts no scripts, styles or connections, because `index.html` has an inline script that applies the saved theme before the first paint. A `default-src` or `script-src` without that script's hash would block it, and the page would flash the wrong theme. The full policy to adopt, once it has been checked in a browser on the deployment:
+
+```text
+default-src 'self'; script-src 'self' 'sha256-<inline script hash>'; style-src 'self'; img-src 'self' data:;
+connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+```
+
+- **Hash:** the SHA-256 of the exact text between `<script>` and `</script>` in `index.html`, base64-encoded. At the time of writing it is `sha256-ncHCUizxRB2LYz9PNbntdQMgNg4rq+ogFeI2FRl5AZQ=`, identical in `client/index.html` and the Vite build. Any change to the script, including whitespace or line endings, changes it. Recompute it from the deployed `index.html` before enabling the policy.
+- **`img-src data:`** is needed for the select arrow, an inline SVG `data:` URL in `global.css`.
+- **`style-src 'self'`:** the app's only inline styles are skeleton widths that React sets through the DOM style API, which `style-src` does not block. The browser check must confirm this.
+- **`connect-src 'self'`:** API calls go only to the app's own origin, through the rewrite.
+- Enabling it means updating the assertion in `client/vercel.test.js` that currently forbids a script policy.
+
+Still to verify on the deployment (all part of the pre-launch checklist):
+
+- The rewrite forwards `Origin`, `Cookie` and `Set-Cookie`, and its timeout allows AI calls (up to about 45 seconds) and Render cold starts. Render's free tier sleeps when idle, so the first request after a pause can be slow.
+- The `TRUST_PROXY` value (see [Proxies and client IPs](#proxies-and-client-ips)).
 - Atlas network access should be limited to Render's outbound IP addresses if they are available for the service. If not, a wider allowlist depends on strong credentials and a least-privilege user, and that trade-off should be documented.
-- The Vercel `/api` rewrite needs checking: header and cookie forwarding, proxy timeout, and client IP forwarding (see [Section 1](#1-system-overview)). If it fails, use the custom-domain fallback described there.
+- If the rewrite is unsuitable, the custom-domain fallback in [Section 1](#1-system-overview) needs code changes first.
 
 ## 8. Implementation Roadmap
 
@@ -413,7 +451,7 @@ Each phase is small and has a testable **done when** condition. Phase 1 is done 
 | **0b. Architecture doc** (**Done**) | This document | Reviewed and committed |
 | **1. Server skeleton** (**Done**; a request-validation library is still undecided, see Section 6) | Confirm candidate libraries (Express version, validation, test runner); Express app, config validation, health routes, error handler, request IDs, logging | Tests pass for: `GET /health` returns 200, an unknown route returns a 404 envelope, and invalid config stops startup |
 | **2. Client skeleton** (**In progress**: implemented and tested; the manual browser check is pending) | Vite + React app, base CSS, API wrapper, dev proxy, a page that shows API health | A component test passes, and the health status appears in the browser in development (manual check) |
-| **3. Deploy the skeleton** | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
+| **3. Deploy the skeleton** (**In progress**: `client/vercel.json` with the API rewrite, SPA fallback and security headers; the validated `TRUST_PROXY` setting; `.node-version` and the documented Render commands, checked locally against the root lockfile. Nothing is deployed, and the production `TRUST_PROXY` value is not measured) | Render service, Vercel project, Atlas cluster, `/api` rewrite, `trust proxy` setting | The deployed client shows the deployed API's health through the rewrite (or the fallback is chosen and documented), and there are no secrets in the repo |
 | **4. Auth** (**In progress**: implemented and tested with an in-memory user store; the real-MongoDB check and the deployed-cookie check are pending) | User model, register/login/logout/me, password hashing, cookie session, CSRF checks, auth rate limits; add `JWT_SECRET` | Tests cover: success, bad credentials, missing or expired session (401), duplicate email (409), a token copied before logout being rejected, and a missing or foreign `Origin` getting 403. The auth cookie also works through the deployed rewrite (manual check). |
 | **5. Organizations and isolation** (**In progress**: models, roles, stores, `POST /organizations`, `GET /organizations`, and the membership and role middleware are implemented and tested, including against a temporary MongoDB replica set; the customer routes use the middleware and have isolation tests, and the other organization routes are not built) | Organization and membership models, membership middleware, roles | The isolation test template passes, a non-member gets 404, and a member without the required role gets 403 |
 | **6. Audit log service** (**In progress**: the model, the explicit `recordAuditEvent` helper, the owner/admin-only read endpoint and the client Audit Logs page are implemented and tested, including against a temporary MongoDB replica set; organization renames and the approval lifecycle record events so far) | Audit log model, write helper, read endpoint | Org-admin-only read is enforced, and mutations in tests create entries |
@@ -435,5 +473,7 @@ These are intentionally left undecided rather than assumed:
 - Which kinds of AI-proposed data change come after `create_task`, and whether pending proposals should expire.
 - Session lifetime, and whether logout should sign out every device (planned default) or only the current one (needs a server-side session store).
 - Whether a custom domain is needed (only if the Vercel rewrite fails verification).
+- How to keep direct requests to the `*.onrender.com` hostname, which skip Vercel, from choosing their own client IP for the sign-in rate limit. The planned per-account login limit would not depend on the IP at all.
+- Whether Vercel preview deployments need a working backend. Today their origins differ from `CLIENT_ORIGIN`, so sign-in and changes are refused there.
 - Inviting members to an organization (would need email delivery; not planned initially).
 - JavaScript or TypeScript (this document assumes JavaScript with ES modules).

@@ -26,6 +26,7 @@ export async function startServer({ config, logger, database, users, organizatio
 
   const app = createApp({
     logger,
+    trustProxy: config.trustProxy,
     clientOrigin: config.clientOrigin,
     databaseState: databaseEnabled ? database.state : undefined,
     auth: databaseEnabled
@@ -42,7 +43,12 @@ export async function startServer({ config, logger, database, users, organizatio
     aiProvider: createAiProvider(config.ai, { logger }),
   });
   const server = await listen(app, config.port);
-  logger.info('server started', { port: server.address().port, nodeEnv: config.nodeEnv, aiProvider: config.ai.provider });
+  logger.info('server started', {
+    port: server.address().port,
+    nodeEnv: config.nodeEnv,
+    trustProxy: config.trustProxy,
+    aiProvider: config.ai.provider,
+  });
 
   let closing;
   function shutdown(signal) {

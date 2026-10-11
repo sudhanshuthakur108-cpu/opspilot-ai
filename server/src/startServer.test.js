@@ -13,10 +13,11 @@ import { signUp } from './testing/signUp.js';
 const DATABASE_URI = 'mongodb://app-user:pw-secret@db.example.com/opspilot';
 const CLIENT_ORIGIN = 'http://localhost:5173';
 
-function configWith(uri, ai = { provider: 'development', openai: null }) {
+function configWith(uri, ai = { provider: 'development', openai: null }, trustProxy = 0) {
   return {
     nodeEnv: 'test',
     port: 0,
+    trustProxy,
     clientOrigin: CLIENT_ORIGIN,
     database: { uri },
     auth: { jwtSecret: uri ? 'test-secret-that-is-at-least-32-chars' : null },
@@ -42,10 +43,10 @@ function fakeDatabase() {
   };
 }
 
-function start(uri, { database = fakeDatabase(), logger = captureLogger(), ai } = {}) {
+function start(uri, { database = fakeDatabase(), logger = captureLogger(), ai, trustProxy } = {}) {
   const { organizations, memberships } = createMemoryOrganizationStores();
   return startServer({
-    config: configWith(uri, ai),
+    config: configWith(uri, ai, trustProxy),
     logger,
     database,
     users: createMemoryUserStore(),
@@ -176,6 +177,23 @@ describe('startServer with a database', () => {
     expect(renamed.status).toBe(200);
     expect(auditLogs.status).toBe(200);
     expect(auditLogs.body.auditLogs.map((entry) => entry.action)).toEqual(['organization.updated']);
+    await shutdown('SIGTERM');
+  });
+
+  it('applies TRUST_PROXY to the client IP that the auth rate limit counts', async () => {
+    const logs = captureLogger();
+    const { server, shutdown } = await start(DATABASE_URI, { logger: logs, trustProxy: 1 });
+    // An empty body fails validation (400) after the attempt has been counted.
+    const attemptLogin = (forwardedFor) =>
+      request(server).post('/api/v1/auth/login').set('Origin', CLIENT_ORIGIN).set('X-Forwarded-For', forwardedFor).send({});
+
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      expect((await attemptLogin('203.0.113.10')).status).toBe(400);
+    }
+
+    expect((await attemptLogin('203.0.113.10')).status).toBe(429);
+    expect((await attemptLogin('203.0.113.20')).status).toBe(400);
+    expect(logs.entries.find((entry) => entry.message === 'server started')).toMatchObject({ trustProxy: 1 });
     await shutdown('SIGTERM');
   });
 

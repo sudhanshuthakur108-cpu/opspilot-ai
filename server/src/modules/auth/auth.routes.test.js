@@ -1,6 +1,6 @@
 import { SignJWT, UnsecuredJWT } from 'jose';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../app.js';
 import { captureLogger } from '../../testing/captureLogger.js';
 import { createMemoryUserStore } from '../../testing/memoryUserStore.js';
@@ -12,10 +12,10 @@ const EMAIL = 'ada@example.com';
 const PASSWORD = 'correct horse battery';
 const NAME = 'Ada Lovelace';
 
-function setup({ secureCookie = false } = {}) {
+function setup({ secureCookie = false, trustProxy } = {}) {
   const users = createMemoryUserStore();
   const logs = captureLogger();
-  const app = createApp({ logger: logs, clientOrigin: ORIGIN, auth: { users, secret: SECRET, secureCookie } });
+  const app = createApp({ logger: logs, trustProxy, clientOrigin: ORIGIN, auth: { users, secret: SECRET, secureCookie } });
   return { app, users, logs };
 }
 
@@ -608,6 +608,51 @@ describe('rate limiting', () => {
 
     for (let attempt = 1; attempt <= 12; attempt += 1) {
       expect((await getMe(app)).status).toBe(401);
+    }
+  });
+});
+
+describe('rate limiting behind proxies', () => {
+  // An empty body fails validation (400) after the attempt has been counted.
+  function attemptLogin(app, forwardedFor) {
+    return request(app).post('/api/v1/auth/login').set('Origin', ORIGIN).set('X-Forwarded-For', forwardedFor).send({});
+  }
+
+  async function useAllAttempts(app, forwardedFor) {
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      expect((await attemptLogin(app, forwardedFor)).status).toBe(400);
+    }
+    expect((await attemptLogin(app, forwardedFor)).status).toBe(429);
+  }
+
+  it('gives each client its own limit, read from the entry the trusted proxies added', async () => {
+    const { app } = setup({ trustProxy: 2 });
+
+    // The first proxy reports the client, the second reports the first proxy.
+    await useAllAttempts(app, '203.0.113.10, 192.0.2.1');
+
+    expect((await attemptLogin(app, '203.0.113.20, 192.0.2.1')).status).toBe(400);
+  });
+
+  it('ignores X-Forwarded-For entries a client adds in front of the trusted proxies', async () => {
+    const { app } = setup({ trustProxy: 2 });
+    await useAllAttempts(app, '203.0.113.10, 192.0.2.1');
+
+    // A client cannot escape its limit by claiming to be someone else.
+    expect((await attemptLogin(app, '198.51.100.99, 203.0.113.10, 192.0.2.1')).status).toBe(429);
+  });
+
+  it('trusts no proxy by default, so X-Forwarded-For cannot change the client and every request shares one limit', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { app } = setup();
+      await useAllAttempts(app, '203.0.113.10');
+
+      expect((await attemptLogin(app, '203.0.113.20')).status).toBe(429);
+      // express-rate-limit warns that the header arrived while no proxy is trusted.
+      expect(consoleError).toHaveBeenCalledWith(expect.objectContaining({ code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR' }));
+    } finally {
+      consoleError.mockRestore();
     }
   });
 });

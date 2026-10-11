@@ -38,8 +38,11 @@ function authUnavailable(req, res, next) {
 // them the AI Assistant only reads.
 // `aiProvider` answers AI Assistant messages (see modules/ai/ai.provider.js); it defaults to the
 // development provider, which connects to no model.
+// `trustProxy` is the number of proxies in front of the app (TRUST_PROXY, see config/proxy.js);
+// it decides which X-Forwarded-For entry becomes `req.ip`, which the auth rate limit is keyed on.
 export function createApp({
   logger = defaultLogger,
+  trustProxy = 0,
   databaseState,
   clientOrigin = DEFAULT_CLIENT_ORIGIN,
   auth,
@@ -52,6 +55,9 @@ export function createApp({
   aiProvider = developmentProvider,
 } = {}) {
   const app = express();
+  // Set before any middleware reads `req.ip`. `false` rather than 0 keeps express-rate-limit's
+  // warning when X-Forwarded-For arrives but no proxy is trusted.
+  app.set('trust proxy', trustProxy > 0 ? trustProxy : false);
 
   app.use(requestId);
   app.use(requestLogger(logger));

@@ -1,6 +1,7 @@
 import { readAiConfig } from './ai.js';
 import { readAuthConfig } from './auth.js';
 import { readDatabaseConfig } from './database.js';
+import { readProxyConfig } from './proxy.js';
 
 const NODE_ENVS = ['development', 'test', 'production'];
 const DEFAULT_PORT = 3000;
@@ -29,6 +30,9 @@ export function loadConfig(env = process.env) {
   } = readAuthConfig(env, nodeEnv, { databaseEnabled: Boolean(database.uri) });
   errors.push(...authErrors);
 
+  const { trustProxy, errors: proxyErrors } = readProxyConfig(env, nodeEnv);
+  errors.push(...proxyErrors);
+
   const { ai, errors: aiErrors } = readAiConfig(env);
   errors.push(...aiErrors);
 
@@ -39,6 +43,7 @@ export function loadConfig(env = process.env) {
   return Object.freeze({
     nodeEnv,
     port,
+    trustProxy,
     clientOrigin,
     database: Object.freeze(database),
     auth: Object.freeze(auth),

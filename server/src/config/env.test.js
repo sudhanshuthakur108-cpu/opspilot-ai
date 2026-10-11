@@ -5,6 +5,7 @@ describe('loadConfig', () => {
   const DEVELOPMENT_DEFAULTS = {
     nodeEnv: 'development',
     port: 3000,
+    trustProxy: 0,
     clientOrigin: 'http://localhost:5173',
     database: { uri: null },
     auth: { jwtSecret: null },
@@ -16,7 +17,7 @@ describe('loadConfig', () => {
   });
 
   it('treats empty values as unset', () => {
-    expect(loadConfig({ NODE_ENV: '', PORT: '', MONGODB_URI: '', CLIENT_ORIGIN: '', JWT_SECRET: '' })).toEqual(
+    expect(loadConfig({ NODE_ENV: '', PORT: '', MONGODB_URI: '', CLIENT_ORIGIN: '', JWT_SECRET: '', TRUST_PROXY: '' })).toEqual(
       DEVELOPMENT_DEFAULTS,
     );
   });
@@ -31,10 +32,12 @@ describe('loadConfig', () => {
         CLIENT_ORIGIN: 'https://app.example.com',
         MONGODB_URI: 'mongodb://127.0.0.1:27017/opspilot',
         JWT_SECRET: jwtSecret,
+        TRUST_PROXY: '2',
       }),
     ).toEqual({
       nodeEnv: 'production',
       port: 8080,
+      trustProxy: 2,
       clientOrigin: 'https://app.example.com',
       database: { uri: 'mongodb://127.0.0.1:27017/opspilot' },
       auth: { jwtSecret },
@@ -52,6 +55,21 @@ describe('loadConfig', () => {
 
   it('includes database problems', () => {
     expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/MONGODB_URI is required/);
+  });
+
+  it('stops production without TRUST_PROXY, even when everything else is valid', () => {
+    expect(() =>
+      loadConfig({
+        NODE_ENV: 'production',
+        CLIENT_ORIGIN: 'https://app.example.com',
+        MONGODB_URI: 'mongodb://127.0.0.1:27017/opspilot',
+        JWT_SECRET: 'x'.repeat(32),
+      }),
+    ).toThrow(/^Invalid server configuration:\n- TRUST_PROXY is required when NODE_ENV is production/);
+  });
+
+  it('rejects a TRUST_PROXY that would trust any proxy chain', () => {
+    expect(() => loadConfig({ TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY must be a whole number of proxies/);
   });
 
   it('reports every problem at once', () => {

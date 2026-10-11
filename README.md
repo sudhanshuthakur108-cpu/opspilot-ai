@@ -63,7 +63,7 @@ Status: the OpenAI provider is covered by automated tests with a stand-in for th
 
 The system design is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). It covers component boundaries, planned API routes, authentication and organization isolation, configuration and error handling, testing, deployment, and a phased [roadmap](docs/ARCHITECTURE.md#8-implementation-roadmap).
 
-Planned deployment:
+Deployment targets:
 
 | Component | Platform      |
 | --------- | ------------- |
@@ -71,7 +71,7 @@ Planned deployment:
 | Backend   | Render        |
 | Database  | MongoDB Atlas |
 
-The frontend is planned to reach the API through a Vercel `/api` rewrite to Render. This still needs to be verified during deployment, and the architecture document describes a fallback.
+The frontend reaches the API through a Vercel `/api` rewrite to Render, configured in [`client/vercel.json`](client/vercel.json). Nothing has been deployed yet, so the rewrite, cookies and proxy settings are unverified; see [Deployment](#deployment).
 
 ## Repository Layout
 
@@ -84,6 +84,7 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 │   │   ├── components/   # shared UI: brand, header, loading screen, text and password fields
 │   │   ├── features/     # screens (auth, organizations: onboarding, dashboard: layout, sidebar and overview, customers, orders, tasks, assistant, approvals, audit, settings)
 │   │   └── styles/       # design tokens and global CSS
+│   ├── vercel.json       # production routing (API rewrite, SPA fallback) and security headers
 │   └── .env.example
 ├── server/               # Express API
 │   ├── src/
@@ -98,12 +99,13 @@ The frontend is planned to reach the API through a Vercel `/api` rewrite to Rend
 ├── docs/
 │   └── ARCHITECTURE.md   # system design and roadmap
 ├── CLAUDE.md             # engineering rules for this project
+├── .node-version         # Node.js version for Render and local version managers
 └── package.json          # npm workspaces and root scripts
 ```
 
 ## Getting Started
 
-Requires Node.js `^22.22.2` or `>=24.15.0` (see `engines` in `package.json`) and npm.
+Requires Node.js `^22.22.2` or `>=24.15.0` (see `engines` in `package.json`) and npm. [`.node-version`](.node-version) pins `24.18.0`, the version the tests are run with and the one Render uses.
 
 ```bash
 git clone https://github.com/sudhanshuthakur108-cpu/opspilot-ai.git
@@ -144,6 +146,7 @@ cp client/.env.example client/.env
 | `MONGODB_URI`       | server              | MongoDB connection string (**secret**; required in production) |
 | `JWT_SECRET`        | server              | Signs session tokens (**secret**; 32+ characters; required when `MONGODB_URI` is set) |
 | `CLIENT_ORIGIN`     | server              | Origin allowed to make state-changing requests (default `http://localhost:5173`; required in production) |
+| `TRUST_PROXY`       | server              | Number of proxies in front of the API, `0`–`5` (default `0`; required in production, measured after deploying, see [Deployment](#deployment)) |
 | `VITE_API_BASE_URL` | client              | API base path or URL (default `/api/v1`); bundled into the browser code |
 | `API_PROXY_TARGET`  | client (dev server) | Where Vite proxies `/api` (default `http://localhost:3000`); not bundled |
 | `AI_PROVIDER`       | server              | `development` (default) or `openai`; any other value stops the server at startup |
@@ -163,6 +166,97 @@ Rules:
 - Never commit `.env` files. `.gitignore` excludes them.
 - `VITE_*` variables are visible in the browser, so they must never hold secrets.
 - Production secrets are set only in the Render dashboard. The Vercel project gets only `VITE_*` variables.
+
+## Deployment
+
+> **Not deployed yet.** The settings below match the repository's layout and were checked locally (the Render build and start commands were run against the real lockfile), but the Vercel rewrite, the session cookie through it and the `TRUST_PROXY` value can only be verified on a real deployment. Launch is blocked until the [pre-launch checklist](#pre-launch-checklist) passes.
+
+### Frontend (Vercel)
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `client` |
+| Framework Preset | Vite |
+| Build Command / Output Directory | defaults: `npm run build`, `dist` |
+| Node.js Version | 24.x (Project Settings) |
+| Environment variables | none. Leave `VITE_API_BASE_URL` unset so it stays `/api/v1` |
+
+The lockfile is at the repository root (npm workspaces). Check the first build log to confirm that Vercel installs from it.
+
+[`client/vercel.json`](client/vercel.json) sends `/api/*` to the Render service `opspilot-ai-52dj.onrender.com`. If the service is ever recreated with another hostname, update the file: `vercel.json` cannot read environment variables, and the hostname is not a secret.
+
+How requests are routed:
+
+1. Files in the build (`index.html`, `/assets/*`, `/favicon.svg`) are served as they are.
+2. `/api/*` is proxied to the same path on Render, with the query string. The browser only ever talks to the Vercel origin, so the session cookie is first-party: it is set on the Vercel host (no `Domain`), `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`.
+3. Every other path returns `index.html`, so reloading `/settings`, `/customers` or any other page opens the app on that page. This rule comes after the API rule, so API paths never fall through to it.
+
+All responses also get `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY` and a Content Security Policy limited to `frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`. A stricter policy that also covers scripts needs the inline theme script's hash; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#content-security-policy).
+
+The client only works through this rewrite: it sends cookies to its own origin only, and the API has no CORS. Pointing `VITE_API_BASE_URL` at the Render URL breaks sign-in.
+
+### Backend (Render)
+
+| Setting | Value |
+| --- | --- |
+| Service type | Web Service, Node runtime |
+| Root Directory | empty (the repository root, where the only lockfile is) |
+| Build Command | `npm ci --workspace server --omit=dev` |
+| Start Command | `npm start --workspace server` |
+| Node version | from [`.node-version`](.node-version) (`24.18.0`); confirm it in the build log |
+| Health Check Path | `/api/v1/health` |
+
+The build command installs only the server's runtime dependencies from the root `package-lock.json` and creates no other lockfile. The start command runs `node --env-file-if-exists=.env src/server.js`; no `.env` exists on Render, so the dashboard variables are used.
+
+### Environment variables by platform
+
+| Variable | Where | Required | Notes |
+| --- | --- | --- | --- |
+| `NODE_ENV` | Render | **Yes** | `production`. Without it, the production checks below are skipped and the cookie is not `Secure` |
+| `MONGODB_URI` | Render | **Yes** | Secret. Production database, least-privilege user |
+| `JWT_SECRET` | Render | **Yes** | Secret, 32+ characters, generated for production only |
+| `CLIENT_ORIGIN` | Render | **Yes** | Exact origin of the Vercel site, see below |
+| `TRUST_PROXY` | Render | **Yes** | Measured value, see below |
+| `AI_PROVIDER` | Render | No | Keep `development` (the default) until the assistant has a rate limit |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Render | Only with `AI_PROVIDER=openai` | Secret key; never in Vercel |
+| `PORT` | Render | Set by Render | Do not set it yourself |
+| `VITE_API_BASE_URL` | Vercel | No | Leave unset |
+
+**`CLIENT_ORIGIN`** must be the exact origin the browser shows for the production site: `https://`, the hostname, and no path or trailing slash (for example `https://<project>.vercel.app`, or the custom domain if you use one). Sign-in and every change are refused (403 `ORIGIN_NOT_ALLOWED`) from any other origin, including Vercel preview URLs.
+
+**`TRUST_PROXY`** tells Express how many proxies sit in front of it, so it can read the real client IP for the sign-in rate limit. Production refuses to start without it. Do not guess the value:
+
+- **Too low:** every user shares one rate limit, so about 10 sign-in attempts in 15 minutes from anyone lock everyone out.
+- **Too high:** Express reads an `X-Forwarded-For` entry the client wrote, so a client can choose its own IP and avoid the limit.
+
+To measure it, deploy with `TRUST_PROXY=0` (nothing trusted), then try `1`, `2` and so on. With each value, send a failed sign-in through the Vercel site and read the `RateLimit` response header, where `r` is the number of attempts left:
+
+```bash
+curl -si -X POST https://<vercel-host>/api/v1/auth/login \
+  -H "Origin: https://<vercel-host>" -H "Content-Type: application/json" -d "{}" | grep -i "^ratelimit"
+```
+
+1. Run it from two different networks, for example home Wi-Fi and a phone's mobile data. If the second network continues the first one's count, the value is too low. Use the smallest value at which the two counts are independent.
+2. With that value, run it again from the first network with `-H "X-Forwarded-For: 198.51.100.1"` added. If that starts a fresh count, the value is too high.
+
+Each attempt uses up one of the 10 allowed per 15 minutes; restarting the service resets the counts.
+
+**Direct access to Render:** the `*.onrender.com` URL stays publicly reachable and skips Vercel, so its proxy chain is shorter. A value measured for the Vercel chain lets a client calling Render directly choose its own IP and avoid the sign-in limit there. Sessions are not exposed this way: the cookie belongs to the Vercel host and is never sent to Render, and the origin check still applies. Closing this gap is an open decision (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#9-open-questions)).
+
+### Pre-launch checklist
+
+**Launch is blocked until every item passes in a browser against the deployed site.** No item has been checked yet.
+
+- [ ] `client/vercel.json` names the real Render hostname, and `npm test -w client` still passes.
+- [ ] Render has `NODE_ENV=production`, the exact `CLIENT_ORIGIN`, a fresh `JWT_SECRET`, the production `MONGODB_URI`, and `AI_PROVIDER` left at `development` unless the assistant has a rate limit.
+- [ ] The Render build log shows Node `24.18.0` and the `npm ci` install. The `server started` log line shows `"nodeEnv":"production"` and the measured `trustProxy`.
+- [ ] `https://<vercel-host>/api/v1/health` and `/api/v1/ready` return 200 through the rewrite.
+- [ ] `TRUST_PROXY` passes both measurement checks above.
+- [ ] Create an account, sign out and sign in. In the browser's developer tools, `opspilot_session` is on the Vercel host with `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/` and no `Domain`, and a reload keeps you signed in.
+- [ ] Creating an organization and a customer works. A 403 `ORIGIN_NOT_ALLOWED` means the rewrite did not forward the `Origin` header or `CLIENT_ORIGIN` does not match.
+- [ ] Reloading directly on `/settings`, `/customers`, `/orders`, `/tasks`, `/approvals` and `/audit-logs` opens the app on that page, not a Vercel 404.
+- [ ] The page's response headers include the security headers above, and the saved theme applies on load and still switches.
+- [ ] An AI Assistant message and the first request after Render has been idle both complete through the rewrite, without a proxy timeout.
 
 ## Development Principles
 

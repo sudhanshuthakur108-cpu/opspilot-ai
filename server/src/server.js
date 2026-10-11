@@ -16,7 +16,18 @@ import { startServer } from './startServer.js';
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 function errorFields(error) {
-  return { name: error.name, message: redactConnectionStrings(error.message) };
+  const fields = { name: error.name, message: redactConnectionStrings(error.message) };
+
+  // Mongoose replaces a server selection error's message with a generic hint (for Atlas, "check
+  // your IP access list"); why each server was unreachable survives only in `reason`.
+  if (error.reason?.servers instanceof Map) {
+    fields.servers = [...error.reason.servers].map(([address, server]) => ({
+      address,
+      type: server.type,
+      error: server.error ? { name: server.error.name, message: redactConnectionStrings(server.error.message) } : null,
+    }));
+  }
+  return fields;
 }
 
 let config;
