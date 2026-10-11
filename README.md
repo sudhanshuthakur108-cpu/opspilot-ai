@@ -38,6 +38,7 @@ The AI Assistant answers questions about an organization's customers, orders and
   - `openai`: calls the OpenAI Responses API through the official `openai` SDK, with the model from `OPENAI_MODEL` (default `gpt-5.4-mini`). Without `OPENAI_API_KEY` it also replies `not_configured`, so the app keeps working; it never falls back to made-up answers. Responses are requested with `store: false`.
 - **Read-only tools:** the model can ask for `list_customers`, `list_orders` and `list_tasks` (newest first, 20 by default, at most 50). The server checks the tool name and arguments, runs the tool for the caller's organization only, and sends back a fixed set of fields per record. The model never gets database access and cannot choose the organization; an `organizationId` in its arguments is ignored.
 - **Limits:** at most 4 model calls and 6 tool calls per message, tool results capped at 20,000 characters, replies at 8,000, a 20-second timeout per OpenAI request and 45 seconds overall. Provider failures return a fixed error message (`AI_PROVIDER_UNAVAILABLE` for rate limits and timeouts, `AI_PROVIDER_ERROR` otherwise); OpenAI's own error text is never sent to the browser or logged.
+- **Rate limit:** each signed-in user may send 20 messages per 15 minutes (429 `RATE_LIMITED` after that), counted per user rather than per IP and kept in memory per server instance, so it resets when the service restarts. It caps what one account can spend; it is not a substitute for a spending limit on the OpenAI project.
 - **No changes through AI:** there are no tools that create, update or delete records. The one other tool, `propose_create_task`, only proposes: the server validates the proposal and, once the reply is complete, saves it as a pending approval (at most 3 per message). The reply then lists them in `suggestedActions` (`{ approvalId, action, status, summary, parameters }`) with `requiresApproval: true`; otherwise `suggestedActions` is `[]` and `requiresApproval` is `false`.
 
 ### Settings and audit log
@@ -57,7 +58,7 @@ This is the first workflow in which the AI can lead to a data change, and **the 
 
 States: `pending → approved | rejected`, then `approved → executed | execution_failed`; no other change is possible. The organization, reviewer and actor always come from the signed-in membership, never from the request. **Supported action: `create_task` only.** Future actions will be added through the same allowlisted registry.
 
-Status: the OpenAI provider is covered by automated tests with a stand-in for the SDK client (tests never call the real API). It has not yet been checked against the real OpenAI API with a key, including whether a real model uses `propose_create_task` as instructed. There is no rate limit on the endpoint yet.
+Status: the OpenAI provider is covered by automated tests with a stand-in for the SDK client (tests never call the real API). It has not yet been checked against the real OpenAI API with a key, including whether a real model uses `propose_create_task` as instructed. See [Enabling the OpenAI assistant](#enabling-the-openai-assistant) for the deployment steps and the checks that still have to be done.
 
 ## Architecture
 
@@ -217,8 +218,9 @@ The build command installs only the server's runtime dependencies from the root 
 | `JWT_SECRET` | Render | **Yes** | Secret, 32+ characters, generated for production only |
 | `CLIENT_ORIGIN` | Render | **Yes** | Exact origin of the Vercel site, see below |
 | `TRUST_PROXY` | Render | **Yes** | Measured value, see below |
-| `AI_PROVIDER` | Render | No | Keep `development` (the default) until the assistant has a rate limit |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Render | Only with `AI_PROVIDER=openai` | Secret key; never in Vercel |
+| `AI_PROVIDER` | Render | No | `development` (the default; no model) or `openai`. See [Enabling the OpenAI assistant](#enabling-the-openai-assistant) |
+| `OPENAI_API_KEY` | Render | With `AI_PROVIDER=openai` | Secret; never in Vercel or any `VITE_*` variable. Without it the assistant replies that no model is connected |
+| `OPENAI_MODEL` | Render | No | Defaults to `gpt-5.4-mini` |
 | `PORT` | Render | Set by Render | Do not set it yourself |
 | `VITE_API_BASE_URL` | Vercel | No | Leave unset |
 
@@ -243,12 +245,24 @@ Each attempt uses up one of the 10 allowed per 15 minutes; restarting the servic
 
 **Direct access to Render:** the `*.onrender.com` URL stays publicly reachable and skips Vercel, so its proxy chain is shorter. A value measured for the Vercel chain lets a client calling Render directly choose its own IP and avoid the sign-in limit there. Sessions are not exposed this way: the cookie belongs to the Vercel host and is never sent to Render, and the origin check still applies. Closing this gap is an open decision (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#9-open-questions)).
 
+### Enabling the OpenAI assistant
+
+The key stays on Render. The browser only ever talks to OpsPilot's own API, never to OpenAI.
+
+1. In the OpenAI dashboard, create an API key in a project with a monthly spending limit, and check that the project can use the model you will set (`gpt-5.4-mini` unless you set `OPENAI_MODEL`). The provider asks OpenAI for encrypted reasoning items between tool rounds, so use a reasoning model such as the GPT-5 family. A model that rejects that option fails with `AI_PROVIDER_ERROR`.
+2. In Render → the service → **Environment**, set `AI_PROVIDER` to `openai` and `OPENAI_API_KEY` to the key. Optionally set `OPENAI_MODEL`. Save, and let Render redeploy.
+3. In the Render logs, the `server started` line should show `"aiProvider":"openai"` and the `aiModel`. If you see `OPENAI_API_KEY is not set`, the key did not reach the service.
+4. In the deployed app, ask the AI Assistant something about your records ("Which orders are pending?"), then ask it to create a follow-up task. The task must appear on the Approvals page as pending, and must not be in Tasks until an owner or admin approves it.
+5. If a message fails, the Render logs have an `openai request failed` line with OpenAI's error class, HTTP status, type and code (never the key or the prompt). `AI_PROVIDER_UNAVAILABLE` means a timeout, a rate limit or an OpenAI outage. `AI_PROVIDER_ERROR` means a rejected key, a missing model permission, an unknown model or a bad request.
+
+Each message can make up to 4 model calls. AI requests can take up to about 45 seconds, and the Vercel rewrite's timeout for that is still unverified.
+
 ### Pre-launch checklist
 
 **Launch is blocked until every item passes in a browser against the deployed site.** No item has been checked yet.
 
 - [ ] `client/vercel.json` names the real Render hostname, and `npm test -w client` still passes.
-- [ ] Render has `NODE_ENV=production`, the exact `CLIENT_ORIGIN`, a fresh `JWT_SECRET`, the production `MONGODB_URI`, and `AI_PROVIDER` left at `development` unless the assistant has a rate limit.
+- [ ] Render has `NODE_ENV=production`, the exact `CLIENT_ORIGIN`, a fresh `JWT_SECRET`, the production `MONGODB_URI`, and `AI_PROVIDER` set on purpose (`development`, or `openai` with a key and an OpenAI spending limit).
 - [ ] The Render build log shows Node `24.18.0` and the `npm ci` install. The `server started` log line shows `"nodeEnv":"production"` and the measured `trustProxy`.
 - [ ] `https://<vercel-host>/api/v1/health` and `/api/v1/ready` return 200 through the rewrite.
 - [ ] `TRUST_PROXY` passes both measurement checks above.

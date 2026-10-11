@@ -297,7 +297,9 @@ describe('startServer AI provider selection', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.reply).toMatchObject({ status: 'not_configured', provider: 'development', text: null });
-    expect(logs.entries.find((entry) => entry.message === 'server started')).toMatchObject({ aiProvider: 'development' });
+    const started = logs.entries.find((entry) => entry.message === 'server started');
+    expect(started).toMatchObject({ aiProvider: 'development' });
+    expect(started).not.toHaveProperty('aiModel');
     await shutdown('SIGTERM');
   });
 
@@ -313,7 +315,7 @@ describe('startServer AI provider selection', () => {
     expect(logs.entries.map((entry) => entry.message)).toContain(
       'OPENAI_API_KEY is not set: the AI Assistant will reply that it is not configured',
     );
-    expect(logs.entries.find((entry) => entry.message === 'server started')).toMatchObject({ aiProvider: 'openai' });
+    expect(logs.entries.find((entry) => entry.message === 'server started')).toMatchObject({ aiProvider: 'openai', aiModel: 'gpt-5.4-mini' });
     await shutdown('SIGTERM');
   });
 });

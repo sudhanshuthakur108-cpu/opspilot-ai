@@ -48,6 +48,7 @@ export async function startServer({ config, logger, database, users, organizatio
     nodeEnv: config.nodeEnv,
     trustProxy: config.trustProxy,
     aiProvider: config.ai.provider,
+    ...(config.ai.openai && { aiModel: config.ai.openai.model }),
   });
 
   let closing;

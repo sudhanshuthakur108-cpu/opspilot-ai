@@ -9,6 +9,7 @@ import { createMemoryOrganizationStores } from '../../testing/memoryOrganization
 import { createMemoryTaskStore } from '../../testing/memoryTaskStore.js';
 import { createMemoryUserStore } from '../../testing/memoryUserStore.js';
 import { signUp } from '../../testing/signUp.js';
+import { MESSAGE_LIMIT } from './ai.routes.js';
 import { createOpenAiProvider } from './openai.provider.js';
 
 const ORIGIN = 'http://localhost:5173';
@@ -521,5 +522,47 @@ describe('AI assistant with the OpenAI provider', () => {
     expect(response.body).toEqual({ error: { code, message, requestId: response.headers['x-request-id'] } });
     expect(response.text).not.toMatch(/sk-test|Rate limit|Incorrect API key/);
     expect(JSON.stringify(logs.entries)).not.toContain(API_KEY);
+  });
+});
+
+describe('AI assistant rate limit', () => {
+  async function useAllMessages(app, { organizationId, cookie }) {
+    for (let count = 1; count <= MESSAGE_LIMIT; count += 1) {
+      expect((await ask(app, organizationId, cookie, { message: 'Hello' })).status).toBe(200);
+    }
+  }
+
+  it(`allows ${MESSAGE_LIMIT} messages per user per window, then refuses without calling the provider`, async () => {
+    const provider = fixedProvider({ status: 'completed', text: 'Hi' });
+    const { app, ada } = await setup({ aiProvider: provider });
+    await useAllMessages(app, ada);
+
+    const limited = await ask(app, ada.organizationId, ada.cookie, { message: 'Hello' });
+
+    expect(limited.status).toBe(429);
+    expect(limited.body.error).toEqual({
+      code: 'RATE_LIMITED',
+      message: 'Too many assistant messages. Try again later.',
+      requestId: limited.headers['x-request-id'],
+    });
+    expect(limited.headers['retry-after']).toBeDefined();
+    expect(provider.respond).toHaveBeenCalledTimes(MESSAGE_LIMIT);
+  });
+
+  it('counts each user separately, even from the same address', async () => {
+    const { app, ada, grace } = await setup({ aiProvider: fixedProvider({ status: 'completed', text: 'Hi' }) });
+    await useAllMessages(app, ada);
+
+    expect((await ask(app, grace.organizationId, grace.cookie, { message: 'Hello' })).status).toBe(200);
+  });
+
+  it('does not count requests the membership check refuses', async () => {
+    const { app, ada, grace } = await setup({ aiProvider: fixedProvider({ status: 'completed', text: 'Hi' }) });
+
+    for (let count = 1; count <= MESSAGE_LIMIT + 5; count += 1) {
+      expect((await ask(app, ada.organizationId, grace.cookie, { message: 'Hello' })).status).toBe(404);
+    }
+
+    expect((await ask(app, grace.organizationId, grace.cookie, { message: 'Hello' })).status).toBe(200);
   });
 });
